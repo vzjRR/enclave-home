@@ -115,6 +115,78 @@ EOF
     ok "created — it still needs the Discord values filling in"
 fi
 
+# ------------------------------------------------- inherited credentials
+
+# The homepage and the store are the same Discord app, the same bot and the
+# same staff list, so five of the values below already exist on this box in
+# the store's env file. Copy them rather than asking someone to paste a bot
+# token twice -- a token retyped by hand is a token typo'd by hand, and the
+# failure looks exactly like a Discord outage.
+#
+# Nothing is echoed: the script reports which keys it copied, never what
+# they contain.
+STORE_ENV=/etc/enclave.env
+
+if [[ -f "$STORE_ENV" ]]; then
+    log "Inheriting shared Discord configuration from $STORE_ENV"
+    # Python rather than sed: a bot token and a client secret contain
+    # characters that are awkward as sed delimiters, and a silently mangled
+    # credential is worse than an obviously missing one.
+    SRC="$STORE_ENV" DST="$ENV_FILE" python3 - <<'PYEOF'
+import os
+
+SRC, DST = os.environ['SRC'], os.environ['DST']
+KEYS = [
+    'DISCORD_CLIENT_ID', 'DISCORD_CLIENT_SECRET', 'DISCORD_BOT_TOKEN',
+    'OWNER_DISCORD_ID', 'ADMIN_DISCORD_IDS',
+]
+
+def read_env(path):
+    values = {}
+    with open(path, encoding='utf-8') as handle:
+        for line in handle:
+            line = line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+            key, value = line.split('=', 1)
+            values[key.strip()] = value.strip()
+    return values
+
+source = read_env(SRC)
+lines = open(DST, encoding='utf-8').read().splitlines()
+
+copied, missing, written = [], [], set()
+for index, line in enumerate(lines):
+    if '=' not in line or line.lstrip().startswith('#'):
+        continue
+    key = line.split('=', 1)[0].strip()
+    if key in KEYS and source.get(key):
+        lines[index] = f'{key}={source[key]}'
+        copied.append(key)
+        written.add(key)
+
+for key in KEYS:
+    if key in written:
+        continue
+    if source.get(key):
+        lines.append(f'{key}={source[key]}')
+        copied.append(key)
+    else:
+        missing.append(key)
+
+open(DST, 'w', encoding='utf-8').write('\n'.join(lines) + '\n')
+
+for key in copied:
+    print(f'  \033[1;32m  \u2713 \033[0mcopied {key}')
+for key in missing:
+    print(f'  \033[1;33m  ! \033[0m{key} is empty in {SRC} too -- fill it by hand')
+PYEOF
+else
+    warn "No $STORE_ENV on this host, so nothing to inherit."
+    warn "Fill DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, DISCORD_BOT_TOKEN and"
+    warn "OWNER_DISCORD_ID in $ENV_FILE by hand."
+fi
+
 # The file holds a bot token and a client secret.
 chown root:"$SERVICE_USER" "$ENV_FILE"
 chmod 640 "$ENV_FILE"
