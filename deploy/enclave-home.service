@@ -6,11 +6,19 @@
 # enclaverp.cc was a static file before this service existed, and keeping
 # it is the condition on having replaced that with something dynamic.
 #
-#   cp deploy/enclave-home.service /etc/systemd/system/
-#   systemctl daemon-reload && systemctl enable --now enclave-home
+# Layout mirrors the store's (/opt/enclave/{app,data}, /etc/enclave.env)
+# so the two deployments look the same on the box:
+#
+#   /opt/enclave-home/app    the checkout
+#   /opt/enclave-home/data   news.json
+#   /etc/enclave-home.env    configuration
+#
+#   sudo install -m 644 deploy/enclave-home.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now enclave-home
 
 [Unit]
 Description=Enclave RP homepage (enclaverp.cc)
+Documentation=https://github.com/vzjRR/enclave-home
 After=network-online.target
 Wants=network-online.target
 
@@ -18,29 +26,52 @@ Wants=network-online.target
 Type=simple
 User=enclave
 Group=enclave
-WorkingDirectory=/opt/enclave-home
-EnvironmentFile=/opt/enclave-home/.env
+WorkingDirectory=/opt/enclave-home/app
+EnvironmentFile=/etc/enclave-home.env
 ExecStart=/usr/bin/node server.js
+
 Restart=always
 RestartSec=3
 
-# The process needs to read its own directory and write one state file.
-# Nothing else on the box is its business.
+# Ceiling so a runaway here can never OOM-kill sshd, or the store, on a
+# small host. Normal use sits well under 100 MB: the largest thing held in
+# memory is the news document and a few cached upstream responses.
+MemoryHigh=256M
+MemoryMax=384M
+# Give up only if it fails repeatedly in a short window, so a bad deploy
+# does not spin forever.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+# The process needs to write exactly one directory. Everything else on the
+# filesystem is read-only to it, so a compromise cannot touch the system.
 NoNewPrivileges=true
 PrivateTmp=true
+PrivateDevices=true
 ProtectSystem=strict
 ProtectHome=true
+ReadWritePaths=/opt/enclave-home/data
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
 RestrictSUIDSGID=true
+RestrictRealtime=true
 RestrictNamespaces=true
 LockPersonality=true
-MemoryDenyWriteExecute=true
-ReadWritePaths=/var/lib/enclave-home
 
 # Outbound only, to Cfx.re, Discord and the store.
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# NOTE: MemoryDenyWriteExecute must stay off, for the same reason it is off
+# on the store's unit. V8 is a JIT and maps executable pages at startup;
+# with it enabled mprotect returns EPERM, V8 asserts that the only tolerable
+# failure is ENOMEM, and the process aborts with a core dump before it ever
+# runs a line of application code.
+
+# @system-service still excludes the dangerous groups (@mount, @reboot,
+# @swap, @module, @obsolete) while permitting the memory calls V8 needs.
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
 
 StandardOutput=journal
 StandardError=journal

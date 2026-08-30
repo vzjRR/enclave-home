@@ -129,7 +129,7 @@ visibly does not work:
 | `TRUST_PROXY=true` | behind Caddy | A forwarded header is honoured only from a trusted peer. |
 | `STORE_API_BASE`, `STORE_URL` | for store highlights | Where the catalogue is read and where buttons point. |
 | `PORT` | no | Defaults to `3001`. The store is on `3000`. |
-| `DATA_DIR` | no | Defaults to `/data` when it exists, else `./data`. |
+| `DATA_DIR` | no | Defaults to `/data` when it exists, else `./data`. On the box: `/opt/enclave-home/data`. |
 
 ---
 
@@ -141,10 +141,14 @@ which proxies to this service and keeps the `cloudflare_only` guard and
 security headers from the original.
 
 ```bash
-cp deploy/enclave-home.service /etc/systemd/system/
-systemctl daemon-reload && systemctl enable --now enclave-home
-systemctl reload caddy
+sudo install -m 644 deploy/enclave-home.service /etc/systemd/system/
+sudo systemctl daemon-reload && sudo systemctl enable --now enclave-home
+sudo systemctl reload caddy
 ```
+
+The layout mirrors the store's, so the two look the same on the box:
+`/opt/enclave-home/app` (checkout), `/opt/enclave-home/data` (news.json),
+`/etc/enclave-home.env` (configuration).
 
 One more step on the Discord side: the app needs a **second redirect URI**,
 `https://enclaverp.cc/auth/discord/callback`, alongside the store's.
