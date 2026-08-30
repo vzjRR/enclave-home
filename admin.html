@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>لوحة الأخبار — ENCLAVE RP</title>
+<meta name="robots" content="noindex">
+
+<link rel="icon" href="/assets/logo.png" type="image/png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Outfit:wght@400;600;700&display=swap">
+
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/css/home.css">
+</head>
+<body>
+
+<!-- Sign-in gate. Shown until /api/admin/session says otherwise. -->
+<section class="auth-screen" id="gate">
+    <div class="auth-card">
+        <img class="auth-logo" src="/assets/logo.png" alt="">
+        <h1 class="auth-title">لوحة الأخبار</h1>
+        <p class="auth-sub">هذه الصفحة للإدارة فقط.</p>
+
+        <p class="notice" id="gateError" hidden></p>
+
+        <a class="btn btn-primary btn-block" id="discordSignIn" href="/auth/discord/start">
+            تسجيل الدخول عبر ديسكورد
+        </a>
+
+        <div class="or-divider"><span>أو</span></div>
+
+        <form id="totpForm" autocomplete="off">
+            <div class="field">
+                <label class="label" for="totpCode">رمز التحقق (للمالك)</label>
+                <input class="input" id="totpCode" name="code" inputmode="numeric"
+                       pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"
+                       placeholder="000000" required>
+                <p class="field-hint">من تطبيق المصادقة — يستخدم فقط لو تعذّر دخول ديسكورد.</p>
+            </div>
+            <button class="btn btn-ghost btn-block" type="submit">دخول</button>
+        </form>
+    </div>
+</section>
+
+<!-- Console. Hidden until authenticated. -->
+<div id="console" hidden>
+    <header class="nav">
+        <div class="nav-inner">
+            <a class="brand" href="/">
+                <img src="/assets/logo.png" alt="">
+                <span class="brand-name">ENCLAVE</span>
+            </a>
+            <div class="nav-actions">
+                <span class="account" id="whoami"></span>
+                <button class="btn btn-quiet btn-sm" type="button" id="signOut">خروج</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="admin-shell">
+        <div class="admin-bar">
+            <div>
+                <span class="eyebrow">الإدارة</span>
+                <h1 class="board-title">الأخبار والإعلانات</h1>
+            </div>
+            <button class="btn btn-primary" type="button" id="newPost">+ خبر جديد</button>
+        </div>
+
+        <div class="table-wrap">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th scope="col">العنوان</th>
+                        <th scope="col">الوسم</th>
+                        <th scope="col">الحالة</th>
+                        <th scope="col">آخر تعديل</th>
+                        <th scope="col"><span class="visually-hidden">إجراءات</span></th>
+                    </tr>
+                </thead>
+                <tbody id="postRows">
+                    <tr><td class="table-empty" colspan="5">جارٍ التحميل…</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </main>
+</div>
+
+<!-- Editor -->
+<div class="modal" id="editor" hidden>
+    <div class="modal-panel modal-panel-wide" role="dialog" aria-modal="true" aria-labelledby="editorTitle">
+        <div class="panel-head">
+            <h2 class="modal-title" id="editorTitle">خبر جديد</h2>
+            <button class="modal-close" type="button" id="editorClose" aria-label="إغلاق">×</button>
+        </div>
+
+        <form id="editorForm">
+            <div class="modal-body">
+                <div class="field">
+                    <label class="label" for="fTitle">العنوان</label>
+                    <input class="input" id="fTitle" name="title" maxlength="140" required>
+                </div>
+
+                <div class="editor-grid">
+                    <div class="field">
+                        <label class="label" for="fTag">الوسم</label>
+                        <input class="input" id="fTag" name="tag" maxlength="32" placeholder="إعلان">
+                    </div>
+                    <div class="field">
+                        <label class="label" for="fSlug">الرابط (اختياري)</label>
+                        <input class="input" id="fSlug" name="slug" placeholder="يُشتق من العنوان">
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="fCover">صورة الغلاف (رابط، اختياري)</label>
+                    <input class="input" id="fCover" name="coverImage" placeholder="https://…">
+                </div>
+
+                <div class="field">
+                    <label class="label" for="fBody">المحتوى</label>
+                    <textarea class="textarea editor-body" id="fBody" name="body" required></textarea>
+                    <p class="field-hint hint-mono">
+                        ## عنوان &nbsp;·&nbsp; **عريض** &nbsp;·&nbsp; *مائل* &nbsp;·&nbsp;
+                        [نص](رابط) &nbsp;·&nbsp; - قائمة &nbsp;·&nbsp; &gt; اقتباس
+                    </p>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="fPinned" name="pinned">
+                    <label for="fPinned">
+                        <span class="checkbox-title">تثبيت في الأعلى</span>
+                        <span class="checkbox-note">يظهر قبل بقية الأخبار.</span>
+                    </label>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="fPublished" name="published">
+                    <label for="fPublished">
+                        <span class="checkbox-title">نشر</span>
+                        <span class="checkbox-note">بدون هذا يبقى الخبر مسودة لا يراها الزوار.</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="modal-foot">
+                <button class="btn btn-danger" type="button" id="deletePost" hidden>حذف</button>
+                <button class="btn btn-ghost" type="button" id="cancelEdit">إلغاء</button>
+                <button class="btn btn-primary" type="submit" id="savePost">حفظ</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script src="/js/core.js"></script>
+<script src="/js/admin.js"></script>
+</body>
+</html>

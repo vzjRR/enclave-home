@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    strategy:
+      matrix:
+        # 18 is the floor declared in package.json; 20 is what production runs.
+        node: ['18', '20']
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Run smoke tests
+        run: npm test
+
+      - name: Check for stray secrets
+        run: |
+          # A bot token, client secret or TOTP seed committed by accident is
+          # the failure worth catching here. Patterns match the leak shape --
+          # a populated key -- not the words themselves, since every one of
+          # these appears legitimately in .env.example with an empty value
+          # and as a DOM id or variable name in the source.
+          if grep -rIn --exclude-dir=.git --exclude-dir=.github --exclude=ci.yml \
+               -e 'DISCORD_BOT_TOKEN=[A-Za-z0-9]' \
+               -e 'DISCORD_CLIENT_SECRET=[A-Za-z0-9]' \
+               -e 'ADMIN_TOTP_SECRET=[A-Za-z2-7]\{16,\}' \
+               -e 'discord\.com/api/webhooks/[0-9]' \
+               . ; then
+            echo "::error::a credential looks committed — see the matches above"
+            exit 1
+          fi
+          echo "no stray credentials found"
+
+      - name: Check the vendored stylesheet was not hand-edited
+        run: |
+          # css/tokens.css and css/styles.css are copies from the store repo,
+          # refreshed with deploy/sync-css.sh. A local edit to either would be
+          # silently reverted by the next sync, so it is worth a warning.
+          if grep -qn 'enclave-home only\|LOCAL EDIT' css/tokens.css css/styles.css; then
+            echo "::error::vendored CSS carries a local edit — put it in css/home.css instead"
+            exit 1
+          fi
+          echo "vendored stylesheet is clean"

@@ -1,0 +1,47 @@
+# Caddy site block for enclaverp.cc.
+#
+# This REPLACES the static HOME_DOMAIN block that the store repo's
+# deploy/setup.sh writes. That block served home/index.html straight off
+# disk with no Node process; this one proxies to the enclave-home service,
+# because live server stats, news and store highlights need a backend.
+#
+# What is deliberately kept from the old block: the cloudflare_only guard
+# and the security headers. What replaces the "stays up even if Node is
+# down" property is the shape of the pages themselves — index.html renders
+# completely without JavaScript or a working API, and each live section
+# degrades on its own.
+#
+# Append to /etc/caddy/Caddyfile, after the store's block. The
+# (cloudflare_only) snippet is defined there and reused here.
+
+enclaverp.cc, www.enclaverp.cc {
+	# setup.sh substitutes this the same way it does for the store: a
+	# Cloudflare Origin Certificate when one is present, otherwise
+	# Let's Encrypt automatically.
+	##TLS_DIRECTIVE##
+
+	import cloudflare_only
+
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:3001 {
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# The application sets Content-Security-Policy, X-Frame-Options,
+	# X-Content-Type-Options, Referrer-Policy and the rest per response
+	# (see lib/http.js), so they are not duplicated here.
+
+	log {
+		output file /var/log/caddy/enclave-home.log {
+			roll_size 20mb
+			roll_keep 5
+		}
+	}
+}

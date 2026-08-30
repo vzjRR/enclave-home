@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>الأخبار والإعلانات — ENCLAVE RP</title>
+<meta name="description" content="تحديثات السيرفر، الفعاليات وإعلانات إدارة Enclave RP.">
+
+<link rel="icon" href="/assets/logo.png" type="image/png">
+<link rel="apple-touch-icon" href="/assets/logo.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Outfit:wght@400;600;700&display=swap">
+
+<link rel="stylesheet" href="/css/tokens.css">
+<link rel="stylesheet" href="/css/styles.css">
+<link rel="stylesheet" href="/css/home.css">
+</head>
+<body>
+
+<a class="visually-hidden" href="#main">تخطَّ إلى المحتوى</a>
+
+<header class="nav">
+    <div class="nav-inner">
+        <a class="brand" href="/">
+            <img src="/assets/logo.png" alt="">
+            <span class="brand-name">ENCLAVE</span>
+        </a>
+        <nav aria-label="روابط الموقع">
+            <ul class="nav-links">
+                <li><a class="nav-link" href="/#server">السيرفر</a></li>
+                <li><a class="nav-link" href="/news" aria-current="true">الأخبار</a></li>
+                <li><a class="nav-link" href="/store">المتجر</a></li>
+            </ul>
+        </nav>
+        <div class="nav-actions">
+            <a class="btn btn-ghost btn-sm" href="/discord" target="_blank" rel="noopener">ديسكورد</a>
+            <a class="btn btn-primary btn-sm" href="/connect">انضم للسيرفر</a>
+        </div>
+    </div>
+</header>
+
+<main id="main" class="section shell-page">
+
+    <!-- Index view: replaced by js/news.js, and a complete page on its own
+         if that never runs. -->
+    <div id="newsIndex">
+        <div class="section-head">
+            <div>
+                <span class="eyebrow">ENCLAVE RP</span>
+                <h2>الأخبار والإعلانات</h2>
+                <p class="section-sub">كل تحديثات السيرفر والفعاليات في مكان واحد.</p>
+            </div>
+        </div>
+
+        <div class="grid" id="newsList">
+            <div class="empty">
+                <h3>لا توجد أخبار بعد</h3>
+                <p>أول إعلان رسمي بينشر هنا قريباً — تابعنا على ديسكورد لين ذلك.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Article view. Hidden until a slug route resolves. -->
+    <article class="page-narrow" id="newsArticle" hidden>
+        <a class="btn btn-quiet btn-sm" href="/news">← كل الأخبار</a>
+        <header class="post-head">
+            <div class="news-meta" id="postMeta"></div>
+            <h1 class="post-title" id="postTitle"></h1>
+        </header>
+        <img class="post-cover" id="postCover" alt="" hidden>
+        <div class="prose" id="postBody"></div>
+    </article>
+
+</main>
+
+<footer class="footer">
+    <div class="footer-inner shell-page">
+        <small>© ENCLAVE RP — جميع الحقوق محفوظة.</small>
+        <a class="footer-credit" href="https://www.tsh87.com" target="_blank" rel="noopener">تصميم وتطوير: vzjRR</a>
+    </div>
+</footer>
+
+<script src="/js/core.js"></script>
+<script src="/js/news.js"></script>
+</body>
+</html>

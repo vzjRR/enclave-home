@@ -1,0 +1,175 @@
+/* ===============================================================
+   ENCLAVE — DESIGN TOKENS
+   Three layers: primitive -> semantic -> component.
+   Nothing below this file should contain a raw colour value.
+
+   The whole palette is anchored on hue 262, sampled from the logo
+   mark (#441AA0, H262 S71 L36). Neutrals carry the same hue at very
+   low saturation, so surfaces, text and accent all read as one
+   family instead of three unrelated colours.
+   =============================================================== */
+
+:root {
+    /* ---------- Layer 1: primitives ---------- */
+
+    --hue: 262;
+
+    /* Neutral ramp — one hue, rising lightness. Never pure black. */
+    --ink-950: hsl(var(--hue) 20% 6%);
+    --ink-900: hsl(var(--hue) 16% 9%);
+    --ink-850: hsl(var(--hue) 14% 12%);
+    --ink-800: hsl(var(--hue) 12% 16%);
+    --ink-700: hsl(var(--hue) 10% 24%);
+    --ink-600: hsl(var(--hue) 9% 34%);
+    --ink-500: hsl(var(--hue) 8% 45%);
+    --ink-400: hsl(var(--hue) 9% 56%);
+    --ink-300: hsl(var(--hue) 10% 68%);
+    --ink-200: hsl(var(--hue) 13% 79%);
+    --ink-100: hsl(var(--hue) 16% 88%);
+    --ink-050: hsl(var(--hue) 24% 96%);
+
+    /* Brand violet — the single accent. Saturation stays under 70%
+       so it reads as a considered colour, not a neon light source. */
+    --brand-700: hsl(var(--hue) 68% 34%);
+    --brand-600: hsl(var(--hue) 62% 48%);
+    --brand-500: hsl(var(--hue) 58% 63%);
+    --brand-400: hsl(var(--hue) 62% 72%);
+    --brand-300: hsl(var(--hue) 66% 82%);
+
+    /* Status. Muted deliberately — these sit inside a dark UI and
+       must not out-shout the accent. */
+    --positive: hsl(152 42% 52%);
+    --caution:  hsl(38 62% 58%);
+    --negative: hsl(2 58% 60%);
+
+    /* ---------- Layer 2: semantic ---------- */
+
+    --surface-page:    var(--ink-950);
+    --surface-raised:  var(--ink-900);
+    --surface-overlay: var(--ink-850);
+    --surface-inset:   hsl(var(--hue) 18% 4%);
+    --surface-hover:   hsl(var(--hue) 14% 15%);
+
+    --text-primary:   var(--ink-050);
+    --text-secondary: var(--ink-300);
+    --text-muted:     var(--ink-500);
+    --text-on-accent: hsl(var(--hue) 40% 8%);
+
+    --border-subtle: hsl(var(--hue) 20% 100% / 0.07);
+    --border-strong: hsl(var(--hue) 20% 100% / 0.14);
+    --border-accent: hsl(var(--hue) 58% 63% / 0.45);
+
+    --accent:        var(--brand-500);
+    --accent-strong: var(--brand-400);
+    --accent-deep:   var(--brand-700);
+    --accent-wash:   hsl(var(--hue) 58% 63% / 0.12);
+    --accent-veil:   hsl(var(--hue) 58% 63% / 0.22);
+
+    --focus-ring: var(--brand-400);
+
+    /* ---------- Typography ---------- */
+
+    --font-display: 'Outfit', 'IBM Plex Sans Arabic', system-ui, sans-serif;
+    --font-body: 'IBM Plex Sans Arabic', 'Outfit', system-ui, sans-serif;
+    --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+    /* Fluid scale. Headlines use clamp so nothing screams on mobile. */
+    --text-xs:   0.75rem;
+    --text-sm:   0.8125rem;
+    --text-base: 0.9375rem;
+    --text-md:   1.0625rem;
+    --text-lg:   clamp(1.125rem, 0.5vw + 1rem, 1.375rem);
+    --text-xl:   clamp(1.375rem, 1vw + 1.1rem, 1.875rem);
+    --text-2xl:  clamp(1.75rem, 2vw + 1.2rem, 2.75rem);
+    --text-3xl:  clamp(2.25rem, 4vw + 1.2rem, 4.5rem);
+
+    --leading-tight: 1.12;
+    --leading-snug: 1.35;
+    --leading-normal: 1.65;
+
+    --tracking-tight: -0.022em;
+    --tracking-normal: 0;
+    --tracking-wide: 0.08em;
+    --tracking-caps: 0.14em;
+
+    /* ---------- Spacing (4px base) ---------- */
+
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+    --space-7: 3rem;
+    --space-8: 4rem;
+    --space-9: 6rem;
+
+    --section-gap: clamp(3.5rem, 8vw, 7rem);
+    --page-max: 1400px;
+    --page-pad: clamp(1.25rem, 4vw, 3.5rem);
+
+    /* ---------- Radii ---------- */
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+    --radius-pill: 999px;
+
+    /* ---------- Elevation ----------
+       Shadows are tinted to the page hue rather than neutral black,
+       so raised surfaces sit in the same light as everything else.
+       No outer glows anywhere. */
+
+    --shadow-sm: 0 1px 2px hsl(var(--hue) 40% 2% / 0.4);
+    --shadow-md: 0 4px 16px -4px hsl(var(--hue) 40% 2% / 0.5);
+    --shadow-lg: 0 18px 48px -12px hsl(var(--hue) 40% 2% / 0.65);
+    --shadow-xl: 0 32px 80px -20px hsl(var(--hue) 45% 1% / 0.75);
+
+    /* ---------- Motion ----------
+       Values from the motion system: transform/opacity only, and
+       nothing slower than 600ms. */
+
+    --dur-fast: 180ms;
+    --dur-normal: 350ms;
+    --dur-slow: 600ms;
+    --ease-smooth: cubic-bezier(0.22, 1, 0.36, 1);
+    --ease-sharp: cubic-bezier(0.4, 0, 0.2, 1);
+    --stagger: 70ms;
+
+    /* ---------- Layer 3: component ---------- */
+
+    --nav-height: 72px;
+    --nav-bg: hsl(var(--hue) 20% 6% / 0.72);
+
+    --btn-primary-bg: var(--accent);
+    --btn-primary-fg: var(--text-on-accent);
+    --btn-primary-bg-hover: var(--accent-strong);
+
+    --btn-ghost-border: var(--border-strong);
+    --btn-ghost-fg: var(--text-primary);
+    --btn-ghost-bg-hover: var(--surface-hover);
+
+    --card-bg: var(--surface-raised);
+    --card-border: var(--border-subtle);
+    --card-radius: var(--radius-lg);
+
+    --field-bg: var(--surface-inset);
+    --field-border: var(--border-strong);
+    --field-fg: var(--text-primary);
+    --field-radius: var(--radius-md);
+
+    --modal-bg: var(--surface-overlay);
+    --modal-scrim: hsl(var(--hue) 30% 3% / 0.78);
+}
+
+/* Honour the OS setting. Motion that communicates state is kept but
+   shortened; motion that only decorates is removed entirely. */
+@media (prefers-reduced-motion: reduce) {
+    :root {
+        --dur-fast: 1ms;
+        --dur-normal: 1ms;
+        --dur-slow: 1ms;
+        --stagger: 0ms;
+    }
+}

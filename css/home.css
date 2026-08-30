@@ -1,0 +1,320 @@
+/* ===============================================================
+   ENCLAVE — homepage additions
+
+   Everything structural (.nav .hero .section .grid .card .stat .badge
+   .btn .empty .skeleton .footer .prose .table .modal .field .toast) comes
+   from styles.css, vendored from the store repo. This file adds only the
+   pieces the homepage introduces: the live server board, the news card
+   meta row, and the Discord panel.
+
+   No raw colour values — every one comes from tokens.css.
+   =============================================================== */
+
+/* ---------------------------------------------------------------
+   Page shell
+--------------------------------------------------------------- */
+
+.shell-page {
+    inline-size: 100%;
+    max-inline-size: var(--page-max);
+    margin-inline: auto;
+    padding-inline: var(--page-pad);
+}
+
+/* The vendored .hero is a two-column product plate. The homepage leads
+   with copy and a status board instead, so the columns are re-weighted
+   and the whole thing collapses to one column sooner. */
+.hero-home {
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+    padding-block: clamp(2.5rem, 6vw, 5rem) 0;
+}
+
+@media (max-width: 900px) {
+    .hero-home {
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--space-6);
+    }
+}
+
+.hero-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* ---------------------------------------------------------------
+   Live server board
+--------------------------------------------------------------- */
+
+.board {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.board-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+}
+
+.board-title {
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
+    font-weight: 600;
+    letter-spacing: var(--tracking-tight);
+}
+
+/* Status pill. The dot pulses only while genuinely live, so "online" is
+   legible at a glance without reading the label. */
+.status {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: 5px 12px;
+    border-radius: var(--radius-pill);
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: var(--tracking-wide);
+    border: 1px solid var(--border-strong);
+    color: var(--text-muted);
+    white-space: nowrap;
+}
+
+.status-dot {
+    inline-size: 8px;
+    block-size: 8px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+}
+
+.status[data-state='online'] {
+    color: var(--positive);
+    border-color: hsl(152 42% 52% / 0.35);
+    background: hsl(152 42% 52% / 0.1);
+}
+.status[data-state='online'] .status-dot { animation: status-pulse 1.8s ease-in-out infinite; }
+
+.status[data-state='full'] {
+    color: var(--caution);
+    border-color: hsl(38 62% 58% / 0.35);
+    background: hsl(38 62% 58% / 0.1);
+}
+
+.status[data-state='offline'] {
+    color: var(--negative);
+    border-color: hsl(2 58% 60% / 0.35);
+    background: hsl(2 58% 60% / 0.1);
+}
+
+@keyframes status-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .3 } }
+@media (prefers-reduced-motion: reduce) {
+    .status[data-state='online'] .status-dot { animation: none }
+}
+
+/* Player capacity. A bar rather than a bare fraction, because "38/64"
+   takes a beat to read and a filled track does not. */
+.slots-track {
+    block-size: 8px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    overflow: hidden;
+}
+
+.slots-fill {
+    block-size: 100%;
+    inline-size: 0;
+    border-radius: inherit;
+    background: linear-gradient(to left, var(--accent), var(--accent-deep));
+    transition: inline-size var(--dur-slow) var(--ease-smooth);
+}
+
+.slots-legend {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin-block-end: var(--space-2);
+}
+
+.slots-count {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-size: var(--text-2xl);
+    font-weight: 600;
+    line-height: 1;
+}
+
+.slots-max { color: var(--text-muted); font-size: var(--text-md); }
+.slots-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+}
+
+.board-meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: var(--space-4);
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--border-subtle);
+}
+.board-meta dt {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+}
+.board-meta dd {
+    font-family: var(--font-mono);
+    font-size: var(--text-base);
+    margin-block-start: 2px;
+    overflow-wrap: anywhere;
+}
+
+.board-note {
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    line-height: var(--leading-snug);
+}
+
+/* ---------------------------------------------------------------
+   News
+--------------------------------------------------------------- */
+
+.news-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    margin-block-end: var(--space-2);
+}
+
+.news-excerpt {
+    color: var(--text-secondary);
+    font-size: var(--text-sm);
+    line-height: var(--leading-normal);
+}
+
+.news-card-link { display: flex; flex-direction: column; flex: 1; }
+.news-card-link:hover .card-name { color: var(--accent-strong); }
+
+/* Article view. .prose carries the typography; this is only the header. */
+.post-head {
+    padding-block-end: var(--space-5);
+    margin-block-end: var(--space-6);
+    border-block-end: 1px solid var(--border-subtle);
+}
+
+.post-title {
+    font-family: var(--font-display);
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    letter-spacing: var(--tracking-tight);
+    line-height: var(--leading-tight);
+    margin-block: var(--space-3);
+    text-wrap: balance;
+}
+
+.post-cover {
+    inline-size: 100%;
+    block-size: auto;
+    max-block-size: 420px;
+    object-fit: cover;
+    border-radius: var(--radius-lg);
+    margin-block-end: var(--space-6);
+}
+
+/* ---------------------------------------------------------------
+   Discord panel
+--------------------------------------------------------------- */
+
+.discord {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-6);
+    padding: var(--space-6);
+    background: var(--accent-wash);
+    border: 1px solid var(--border-accent);
+    border-radius: var(--radius-xl);
+}
+
+@media (max-width: 760px) {
+    .discord { grid-template-columns: minmax(0, 1fr); }
+}
+
+.discord-title {
+    font-family: var(--font-display);
+    font-size: var(--text-xl);
+    font-weight: 700;
+    letter-spacing: var(--tracking-tight);
+    margin-block-end: var(--space-2);
+}
+
+.discord-sub { color: var(--text-secondary); font-size: var(--text-sm); }
+
+/* The stat row inside the panel sits on the accent wash, so its tiles
+   need a surface of their own to stay legible. */
+.discord .stat { background: var(--surface-page); border: 1px solid var(--border-subtle); }
+
+/* ---------------------------------------------------------------
+   Admin
+--------------------------------------------------------------- */
+
+.admin-shell { max-inline-size: 1100px; margin-inline: auto; padding: var(--space-6) var(--page-pad); }
+
+.admin-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    flex-wrap: wrap;
+    margin-block-end: var(--space-6);
+}
+
+.editor-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: var(--space-4);
+}
+
+.editor-body { min-block-size: 320px; font-family: var(--font-mono); line-height: var(--leading-normal); }
+
+.hint-mono { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--text-muted); }
+
+/* ---------------------------------------------------------------
+   Narrow-screen nav
+
+   styles.css already hides .nav-links below 620px, which is enough for
+   the store's single nav button. These pages carry two, and below about
+   480px the pair overflows .nav-inner and pushes the primary call to
+   action off the inline-start edge entirely.
+
+   The secondary link goes rather than the primary one: Discord is still
+   one tap away in the hero and again in the community section, whereas
+   "join the server" appears nowhere else above the fold.
+--------------------------------------------------------------- */
+
+@media (max-width: 480px) {
+    .nav-actions .btn-ghost { display: none; }
+}
+
+/* At 360px and below even the wordmark and one button do not both fit --
+   .brand-name carries 0.18em of tracking, which is most of the overflow.
+   The logo alone still identifies the site and still links home. */
+@media (max-width: 360px) {
+    .brand-name { display: none; }
+}

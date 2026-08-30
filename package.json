@@ -1,0 +1,15 @@
+{
+  "name": "enclave-home",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Enclave RP — the official community homepage: live FiveM server stats, news, store highlights and Discord activity",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "test": "node test/smoke.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
