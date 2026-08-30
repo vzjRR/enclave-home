@@ -88,7 +88,7 @@ PUBLIC_BASE_URL=https://enclaverp.cc
 TRUST_PROXY=true
 
 # Live server board
-FIVEM_JOIN_CODE=pggedl8
+FIVEM_JOIN_CODE=dggpkvq
 FIVEM_PUBLISH_PLAYER_LIST=false
 
 # Discord stats (the invite alone is enough — no token required)
