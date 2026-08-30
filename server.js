@@ -35,6 +35,21 @@ const {
 /* ------------------------------ config ------------------------------ */
 
 const PORT = Number(process.env.PORT) || 3001;
+
+/**
+ * Loopback by default.
+ *
+ * Caddy reverse-proxies to 127.0.0.1:3001, so binding wider than that gains
+ * nothing and costs a bypass: the Caddyfile refuses any peer that is not
+ * Cloudflare, and that refusal is the only reason CF-Connecting-IP can be
+ * believed. A process listening on the public interface can be reached
+ * around Caddy entirely, at which point the header is whatever the caller
+ * says it is -- the exact attack the store's Caddyfile documents.
+ *
+ * Overridable for a platform that routes to a container by address rather
+ * than through a local proxy, where 0.0.0.0 is required.
+ */
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const PUBLIC_DIR = __dirname;
 
@@ -586,8 +601,8 @@ async function start() {
     }, 10 * 60 * 1000);
     sweeper.unref();
 
-    server.listen(PORT, () => {
-        console.log(`enclave-home listening on http://localhost:${PORT}`);
+    server.listen(PORT, BIND_HOST, () => {
+        console.log(`enclave-home listening on http://${BIND_HOST}:${PORT}`);
         if (!FIVEM_JOIN_CODE) {
             console.warn('FIVEM_JOIN_CODE is unset — the live server board will show "not configured".');
         }

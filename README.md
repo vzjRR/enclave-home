@@ -129,6 +129,7 @@ visibly does not work:
 | `TRUST_PROXY=true` | behind Caddy | A forwarded header is honoured only from a trusted peer. |
 | `STORE_API_BASE`, `STORE_URL` | for store highlights | Where the catalogue is read and where buttons point. |
 | `PORT` | no | Defaults to `3001`. The store is on `3000`. |
+| `BIND_HOST` | no | Defaults to `127.0.0.1`. Only widen it for a platform that routes by address rather than through a local proxy. |
 | `DATA_DIR` | no | Defaults to `/data` when it exists, else `./data`. On the box: `/opt/enclave-home/data`. |
 
 ---
