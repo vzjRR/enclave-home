@@ -71,18 +71,74 @@ chown -R "$SERVICE_USER:$SERVICE_USER" /opt/enclave-home
 # news.json can contain unpublished drafts; keep it off other users' eyes.
 chmod 750 "$DATA_DIR"
 
+# ----------------------------------------------------------------- port
+
+# Do not assume 3001 is free. This box already runs the store on 3000 and,
+# in at least one deployment, a third service on 3001 -- an assumption that
+# cost an operator a crash loop and a puzzling 404 from someone else's app
+# answering on the port we expected to own.
+#
+# `ss` is not guaranteed present, so the real test is the one that matters:
+# ask the kernel for the port the same way the service will, using the Node
+# that is already a hard dependency.
+port_free() {
+    node -e '
+        const net = require("net");
+        const server = net.createServer();
+        server.once("error", () => process.exit(1));
+        server.listen(Number(process.argv[1]), "127.0.0.1", () => {
+            server.close(() => process.exit(0));
+        });
+    ' "$1" 2>/dev/null
+}
+
+pick_port() {
+    local candidate=$1
+    local limit=$((candidate + 40))
+    while (( candidate < limit )); do
+        if port_free "$candidate"; then
+            printf '%s' "$candidate"
+            return 0
+        fi
+        candidate=$((candidate + 1))
+    done
+    return 1
+}
+
 # ------------------------------------------------------------------ env
 
 if [[ -f "$ENV_FILE" ]]; then
     ok "$ENV_FILE already exists — left untouched"
+
+    # It is left untouched, but a stale port in it is worth naming now
+    # rather than leaving someone to find it in `journalctl` later.
+    existing_port="$(grep -m1 '^PORT=' "$ENV_FILE" | cut -d= -f2- | tr -d '[:space:]')"
+    if [[ -n "$existing_port" ]] && ! port_free "$existing_port"; then
+        warn "PORT=$existing_port in $ENV_FILE is already in use by another process."
+        warn "The service will fail to start with EADDRINUSE. Pick a free port:"
+        suggestion="$(pick_port "$existing_port" || echo '')"
+        if [[ -n "$suggestion" ]]; then
+            warn "  sed -i 's/^PORT=.*/PORT=$suggestion/' $ENV_FILE"
+            warn "  and match it in the reverse_proxy line of your Caddy block."
+        fi
+    fi
+    PORT_CHOSEN="${existing_port:-3001}"
 else
-    log "Writing $ENV_FILE"
+    PORT_CHOSEN="$(pick_port 3001)" || {
+        echo "no free port found in 3001-3040" >&2
+        exit 1
+    }
+    if [[ "$PORT_CHOSEN" != "3001" ]]; then
+        warn "3001 is taken on this host; using $PORT_CHOSEN instead."
+    fi
+
+    log "Writing $ENV_FILE (port $PORT_CHOSEN)"
     cat > "$ENV_FILE" <<EOF
 # Enclave RP homepage. Fill in the blanks, then:
 #   sudo systemctl restart enclave-home
 
 NODE_ENV=production
-PORT=3001
+PORT=$PORT_CHOSEN
 DATA_DIR=$DATA_DIR
 PUBLIC_BASE_URL=https://enclaverp.cc
 TRUST_PROXY=true
@@ -201,30 +257,56 @@ ok "enclave-home enabled"
 
 # ----------------------------------------------------------------- done
 
+# Build the Caddy block the operator has to paste, with both variables that
+# can differ per host already substituted: the TLS line (copied from the
+# store's own block, so certificates are handled identically) and the port
+# chosen above. Generating it here is what stops the port in the env file
+# and the port in the reverse_proxy line from drifting apart -- the failure
+# that produces is a 502 with nothing obviously wrong in either file.
+BLOCK_OUT=/tmp/enclaverp-caddy-block.conf
+TLS_LINE="$(grep -m1 -E '^[[:space:]]*tls[[:space:]]' /etc/caddy/Caddyfile 2>/dev/null || true)"
+if [[ -z "$TLS_LINE" ]]; then
+    TLS_LINE=$'\t# TLS handled automatically by Caddy (Let\'s Encrypt)'
+fi
+
+sed -e "s|##TLS_DIRECTIVE##|${TLS_LINE}|" \
+    -e "s|127\.0\.0\.1:3001|127.0.0.1:${PORT_CHOSEN}|" \
+    "$APP_DIR/deploy/Caddyfile.home" > "$BLOCK_OUT"
+chmod 644 "$BLOCK_OUT"
+ok "Caddy block written to $BLOCK_OUT (upstream 127.0.0.1:$PORT_CHOSEN)"
+
 cat <<EOF
 
 $(log "Next, by hand")
 
-1. Fill in the Discord values in $ENV_FILE, then:
+1. Fill in anything still blank in $ENV_FILE, then:
 
      sudo systemctl restart enclave-home
      sudo journalctl -u enclave-home -n 30 --no-pager
+     curl -s http://127.0.0.1:$PORT_CHOSEN/api/health
 
    With ADMIN_TOTP_SECRET blank, the startup log prints a generated secret.
    Add it to your authenticator app, paste it into $ENV_FILE, and restart
    once more so it survives the next restart.
 
+   Do not go to step 2 until that curl returns {"ok":true,...}. While the
+   service is down the old static page keeps serving visitors, which is the
+   safe state to debug from.
+
 2. Replace the enclaverp.cc block in /etc/caddy/Caddyfile.
 
-   setup.sh wrote a static block for this domain ("root * \$APP_DIR" and
-   "rewrite / /home/index.html"). Delete that whole block and paste the
-   contents of:
+   setup.sh wrote a static block for this domain ("root * \\$APP_DIR" and
+   "rewrite / /home/index.html"). See it with:
 
-     $APP_DIR/deploy/Caddyfile.home
+     sudo awk '/^enclaverp\.cc/,/^}/' /etc/caddy/Caddyfile
 
-   Substitute ##TLS_DIRECTIVE## the same way the store's block does — copy
-   the tls line from the store's block above it. Then:
+   Back up, delete that whole block, and paste the contents of:
 
+     $BLOCK_OUT
+
+   Then, before reloading — a syntax error here takes the store down too:
+
+     sudo cp /etc/caddy/Caddyfile /etc/caddy/Caddyfile.bak
      sudo caddy validate --config /etc/caddy/Caddyfile
      sudo systemctl reload caddy
 
