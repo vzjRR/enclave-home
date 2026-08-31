@@ -106,9 +106,41 @@ there is no sanitiser pass afterwards because there is nothing left to
 sanitise. Rendering server-side also keeps a Markdown library off the page,
 which a `script-src 'self'` policy with no CDN would otherwise make awkward.
 
-State lives in one JSON file, written atomically (temp file → fsync →
-rename) with mutations serialised through a single chain, so two concurrent
-saves cannot interleave into a half-written document.
+State lives in JSON files, written atomically (temp file → fsync → rename)
+with mutations serialised through a single chain, so two concurrent saves
+cannot interleave into a half-written document. `lib/jsonStore.js` provides
+that for both `news.json` and `settings.json`.
+
+### Settings
+
+The console's second tab edits the values that change in the ordinary life
+of the community. Environment variables **seed** them on first run and are
+ignored afterwards — the same one-time-seed idiom the store repo uses for
+its payment details — so there is never a question of which is authoritative.
+
+| Editable at `/admin` | Why it is safe to expose |
+|---|---|
+| FiveM join code | Worst case is a dead join button |
+| Discord invite code | Worst case is a dead invite |
+| Store URL | Validated `https://` only, so it cannot become a stored redirect |
+| Publish player list | A visibility choice for the community to make |
+
+A save applies immediately and drops only the caches whose inputs moved — a
+store-URL edit does not throw away a warm FiveM poll.
+
+**Not editable, deliberately.** `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN`
+and `ADMIN_TOTP_SECRET` because a settings page that can write a secret can
+read it back, and the same bot and app run the store too. `OWNER_DISCORD_ID`
+and `ADMIN_DISCORD_IDS` because editing who may administer *from inside the
+admin console* is a privilege-escalation ladder. `DISCORD_GUILD_ID` because
+sign-in checks membership of it. `PORT`, `BIND_HOST`, `DATA_DIR`,
+`PUBLIC_BASE_URL` and `STORE_API_BASE` because they must agree with systemd
+and Caddy, which a web form cannot update. Those stay in
+`/etc/enclave-home.env`, where changing them needs shell access.
+
+The console lists them read-only, so an operator can see what is configured
+and knows to reach for the env file rather than hunt for a missing field.
+Credentials appear only as "set" or "not set", never as values.
 
 ---
 
@@ -119,15 +151,17 @@ visibly does not work:
 
 | Variable | Required | Purpose |
 |---|---|---|
-| `FIVEM_JOIN_CODE` | for the status board | The code from `cfx.re/join/<code>`. |
-| `DISCORD_GUILD_ID`, `DISCORD_INVITE_CODE` | for Discord stats | The invite alone is enough; no token needed. |
+| `FIVEM_JOIN_CODE` | first run only | Seeds the join code; edit it at `/admin` afterwards. |
+| `DISCORD_GUILD_ID` | **yes** | Sign-in checks membership of this guild. Not editable in the console. |
+| `DISCORD_INVITE_CODE` | first run only | Seeds the invite; edit it at `/admin` afterwards. |
 | `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET`, `DISCORD_BOT_TOKEN` | for Discord admin sign-in | Without these, staff use the TOTP route. |
 | `OWNER_DISCORD_ID` | **yes** | Who may publish. |
 | `ADMIN_TOTP_SECRET` | **yes, in production** | Break-glass login. |
 | `PUBLIC_BASE_URL` | for Discord sign-in | The OAuth redirect is built from it. |
 | `NODE_ENV=production` | **yes, in production** | Session cookies get the `Secure` flag. |
 | `TRUST_PROXY=true` | behind Caddy | A forwarded header is honoured only from a trusted peer. |
-| `STORE_API_BASE`, `STORE_URL` | for store highlights | Where the catalogue is read and where buttons point. |
+| `STORE_API_BASE` | for store highlights | Where the catalogue is fetched from. Infrastructure, not editable in the console. |
+| `STORE_URL` | first run only | Seeds where the buttons point; edit it at `/admin` afterwards. |
 | `PORT` | no | Whatever the installer found free, starting at `3001` (the store is on `3000`, and a box may run other services). The Caddy block it generates uses the same port. |
 | `BIND_HOST` | no | Defaults to `127.0.0.1`. Only widen it for a platform that routes by address rather than through a local proxy. |
 | `DATA_DIR` | no | Defaults to `/data` when it exists, else `./data`. On the box: `/opt/enclave-home/data`. |

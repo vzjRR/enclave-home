@@ -66,12 +66,17 @@
         <div class="admin-bar">
             <div>
                 <span class="eyebrow">الإدارة</span>
-                <h1 class="board-title">الأخبار والإعلانات</h1>
+                <h1 class="board-title" id="paneTitle">الأخبار والإعلانات</h1>
             </div>
             <button class="btn btn-primary" type="button" id="newPost">+ خبر جديد</button>
         </div>
 
-        <div class="table-wrap">
+        <div class="tabs" role="tablist">
+            <button class="tab" type="button" role="tab" data-pane="news" aria-selected="true">الأخبار</button>
+            <button class="tab" type="button" role="tab" data-pane="settings" aria-selected="false">الإعدادات</button>
+        </div>
+
+        <div class="table-wrap" id="paneNews">
             <table class="table">
                 <thead>
                     <tr>
@@ -87,6 +92,70 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- Settings -->
+        <form id="paneSettings" hidden>
+            <p class="section-sub">
+                إعدادات تشغيلية — تُحفظ فوراً وتُطبَّق بدون إعادة تشغيل الخدمة.
+            </p>
+
+            <div class="panel">
+                <div class="field">
+                    <label class="label" for="sJoin">رمز انضمام السيرفر (FiveM)</label>
+                    <input class="input" id="sJoin" name="fivemJoinCode" placeholder="dggpkvq" dir="ltr">
+                    <p class="field-hint">
+                        الرمز من <span class="hint-mono">cfx.re/join/…</span> — تقدر تلصق الرابط كامل وبنستخرج الرمز.
+                        يتحكم في زر «انضم إلى السيرفر» وفي لوحة حالة السيرفر.
+                    </p>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="sInvite">رمز دعوة ديسكورد</label>
+                    <input class="input" id="sInvite" name="discordInviteCode" placeholder="7KuYSBX4A" dir="ltr">
+                    <p class="field-hint">
+                        الرمز فقط من <span class="hint-mono">discord.gg/…</span> — أو الصق الرابط كامل.
+                    </p>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="sStore">رابط المتجر</label>
+                    <input class="input" id="sStore" name="storeUrl" placeholder="https://store.enclaverp.cc" dir="ltr">
+                    <p class="field-hint">وين توديك أزرار «زيارة المتجر». لازم يبدأ بـ https://</p>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="sPlayers" name="publishPlayerList">
+                    <label for="sPlayers">
+                        <span class="checkbox-title">عرض أسماء اللاعبين المتصلين</span>
+                        <span class="checkbox-note">
+                            معطّل افتراضياً. الأسماء فقط — معرفات ستيم والديسكورد وعناوين IP
+                            تُحذف دائماً قبل أن تصل للمتصفح.
+                        </span>
+                    </label>
+                </div>
+
+                <div class="card-actions">
+                    <button class="btn btn-primary" type="submit" id="saveSettings">حفظ الإعدادات</button>
+                    <span class="field-hint" id="settingsMeta"></span>
+                </div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="modal-title">إعدادات لا تُعدَّل من هنا</h2>
+                </div>
+                <p class="field-hint">
+                    هذه تُضبط في <span class="hint-mono">/etc/enclave-home.env</span> وتحتاج وصول للخادم.
+                    الأسرار ومن يملك صلاحية الإدارة تحديداً — لأن صفحة إعدادات تقدر تكتبها
+                    تقدر تقرأها، وجلسة إدارة واحدة مخترقة تكفي عندها للوصول لكل شيء.
+                </p>
+                <div class="table-wrap">
+                    <table class="table">
+                        <tbody id="lockedRows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </form>
     </main>
 </div>
 

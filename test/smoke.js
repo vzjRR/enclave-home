@@ -410,6 +410,75 @@ async function main() {
         eq((await request(base, '/api/admin/news', { cookie, headers: { 'X-CSRF-Token': csrf } }))
             .json.posts.length, 1, 'deleted post gone from the admin list');
 
+        /* ------------------------- settings ------------------------- */
+
+        eq((await request(base, '/api/admin/settings')).status, 401,
+            'unauthenticated settings read rejected');
+        eq((await request(base, '/api/admin/settings', {
+            method: 'PUT', body: { fivemJoinCode: 'hacked' }
+        })).status, 401, 'unauthenticated settings write rejected');
+
+        const readSettings = () => request(base, '/api/admin/settings',
+            { cookie, headers: { 'X-CSRF-Token': csrf } });
+
+        const seeded = await readSettings();
+        eq(seeded.status, 200, 'settings readable by staff');
+        eq(seeded.json.settings.fivemJoinCode, 'testcode', 'seeded from the environment');
+        eq(seeded.json.settings.publishPlayerList, true, 'player-list seed carried through');
+
+        // The locked block tells the operator what exists without handing
+        // it over. A regression here leaks a bot token into a web page.
+        ok('botToken' in seeded.json.locked, 'locked block reports the bot token');
+        eq(typeof seeded.json.locked.botToken, 'boolean',
+            'bot token reported as a boolean, never its value');
+        const lockedText = JSON.stringify(seeded.json.locked);
+        ok(!lockedText.includes('secret') && !lockedText.includes('SECRET'),
+            'no secret material in the locked block');
+
+        const putSettings = body => request(base, '/api/admin/settings',
+            { method: 'PUT', body, cookie, headers: { 'X-CSRF-Token': csrf } });
+
+        // A pasted URL must be stored as a bare code, or it resolves to
+        // nothing later and reads as an outage.
+        const normalised = await putSettings({
+            fivemJoinCode: 'https://cfx.re/join/newcode1',
+            discordInviteCode: 'https://discord.gg/abc-123',
+            storeUrl: 'https://shop.example.test/',
+            publishPlayerList: false
+        });
+        eq(normalised.status, 200, 'settings saved');
+        eq(normalised.json.settings.fivemJoinCode, 'newcode1', 'join URL normalised to a code');
+        eq(normalised.json.settings.discordInviteCode, 'abc-123', 'invite URL normalised to a code');
+        eq(normalised.json.settings.storeUrl, 'https://shop.example.test', 'trailing slash trimmed');
+
+        // Saving must take effect immediately — the whole point of moving
+        // these out of the env file is not needing a restart.
+        const site = await request(base, '/api/site');
+        eq(site.json.joinCode, 'newcode1', 'live config reflects the save without a restart');
+        eq(site.json.storeUrl, 'https://shop.example.test', 'store URL applied live');
+        eq((await request(base, '/store')).headers.location, 'https://shop.example.test',
+            'redirect follows the saved setting');
+
+        eq((await putSettings({
+            fivemJoinCode: 'newcode1', discordInviteCode: 'abc-123',
+            storeUrl: 'https://shop.example.test', publishPlayerList: false
+        })).json.changed.length, 0, 'a no-op save reports nothing changed');
+
+        for (const [label, body] of [
+            ['join code with a space', { fivemJoinCode: 'bad code' }],
+            ['non-https store url', { storeUrl: 'http://insecure.test' }],
+            ['javascript: store url', { storeUrl: 'javascript:alert(1)' }]
+        ]) {
+            eq((await putSettings(body)).status, 400, `rejected: ${label}`);
+        }
+
+        // Restore, so the outage assertions below still describe a
+        // configured server rather than one this block broke.
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true
+        });
+
         /* ----------------------- upstream failures ----------------------- */
 
         // A dead game server must degrade to an offline board, not an error,

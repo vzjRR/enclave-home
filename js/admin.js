@@ -12,7 +12,7 @@
 (function (E) {
     'use strict';
 
-    const { $, html, render, api, timeAgo, toast } = E;
+    const { $, $$, html, render, api, timeAgo, toast } = E;
 
     // Reasons the OAuth redirect can come back with. The server sends a
     // fixed code and the wording lives here, so nothing from Discord's
@@ -172,6 +172,86 @@
         }
     }
 
+    /* ----------------------------- settings ----------------------------- */
+
+    const LOCKED_LABELS = {
+        guildId: 'معرّف سيرفر ديسكورد',
+        storeApiBase: 'مصدر بيانات المتجر',
+        publicBaseUrl: 'عنوان الموقع',
+        discordSignIn: 'دخول ديسكورد',
+        botToken: 'توكن البوت'
+    };
+
+    function lockedValue(key, value) {
+        // Booleans describe whether a credential is configured, never what
+        // it is — the server only ever sends the boolean for those.
+        if (typeof value === 'boolean') return value ? 'مضبوط' : 'غير مضبوط';
+        return value || '—';
+    }
+
+    async function loadSettings() {
+        const { settings, locked } = await api('/api/admin/settings');
+
+        $('#sJoin').value = settings.fivemJoinCode || '';
+        $('#sInvite').value = settings.discordInviteCode || '';
+        $('#sStore').value = settings.storeUrl || '';
+        $('#sPlayers').checked = settings.publishPlayerList === true;
+
+        $('#settingsMeta').textContent = settings.updatedAt
+            ? `آخر تعديل ${timeAgo(settings.updatedAt)}${settings.updatedBy ? ` — ${settings.updatedBy}` : ''}`
+            : '';
+
+        render('#lockedRows', html`${Object.keys(LOCKED_LABELS).map(key => html`
+            <tr>
+                <td>${LOCKED_LABELS[key]}</td>
+                <td class="hint-mono">${lockedValue(key, locked[key])}</td>
+            </tr>`)}`);
+    }
+
+    async function saveSettings(event) {
+        event.preventDefault();
+        const button = $('#saveSettings');
+        button.disabled = true;
+
+        try {
+            const { changed } = await api('/api/admin/settings', {
+                method: 'PUT',
+                body: {
+                    fivemJoinCode: $('#sJoin').value.trim(),
+                    discordInviteCode: $('#sInvite').value.trim(),
+                    storeUrl: $('#sStore').value.trim(),
+                    publishPlayerList: $('#sPlayers').checked
+                }
+            });
+            toast(changed.length ? 'تم حفظ الإعدادات.' : 'لا يوجد تغيير.');
+            // Re-read rather than trusting the form: the server normalises
+            // a pasted URL down to a bare code, and the field should show
+            // what was actually stored.
+            await loadSettings();
+        } catch (error) {
+            toast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    /* ------------------------------- panes ------------------------------- */
+
+    const PANE_TITLES = { news: 'الأخبار والإعلانات', settings: 'الإعدادات' };
+
+    function showPane(name) {
+        $$('.tab').forEach(tab => {
+            tab.setAttribute('aria-selected', String(tab.getAttribute('data-pane') === name));
+        });
+        $('#paneNews').hidden = name !== 'news';
+        $('#paneSettings').hidden = name !== 'settings';
+        // "New post" belongs to the news pane only; leaving it visible on
+        // settings would open an editor over a form the operator is filling.
+        $('#newPost').hidden = name !== 'news';
+        $('#paneTitle').textContent = PANE_TITLES[name] || '';
+        if (name === 'settings') loadSettings().catch(e => toast(e.message, 'error'));
+    }
+
     /* ------------------------------ boot ------------------------------ */
 
     async function signInWithTotp(event) {
@@ -200,6 +280,10 @@
 
     async function init() {
         $('#totpForm').addEventListener('submit', signInWithTotp);
+        $('#paneSettings').addEventListener('submit', saveSettings);
+        $$('.tab').forEach(tab => {
+            tab.addEventListener('click', () => showPane(tab.getAttribute('data-pane')));
+        });
         $('#editorForm').addEventListener('submit', save);
         $('#newPost').addEventListener('click', () => openEditor(null));
         $('#editorClose').addEventListener('click', closeEditor);
