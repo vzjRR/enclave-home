@@ -111,6 +111,26 @@ with mutations serialised through a single chain, so two concurrent saves
 cannot interleave into a half-written document. `lib/jsonStore.js` provides
 that for both `news.json` and `settings.json`.
 
+### News synced from Discord
+
+With `newsSyncEnabled` on, the service polls the configured announcement
+channels every five minutes with the bot token and turns each message into
+a **draft**. Nothing reaches the public site until someone publishes it in
+the console — a channel added by mistake costs a few drafts to delete
+rather than a wrong announcement on the homepage.
+
+A post is deleted when its Discord message is deleted. That needs more care
+than "it wasn't in the response": each poll sees only the newest 50
+messages, so a tracked message can be missing because it was deleted *or*
+because it aged out of the window. Only a message newer than the oldest one
+the poll returned can be judged deleted — without that check, the first
+sync of a busy channel would wipe the entire archive. Posts written by hand
+carry no `source` and are never touched.
+
+Per-channel status (ok / no access / not found) is shown in the console, so
+a missing bot permission is visible rather than presenting as news that
+never arrives.
+
 ### Settings
 
 The console's second tab edits the values that change in the ordinary life
@@ -124,6 +144,9 @@ its payment details — so there is never a question of which is authoritative.
 | Discord invite code | Worst case is a dead invite |
 | Store URL | Validated `https://` only, so it cannot become a stored redirect |
 | Publish player list | A visibility choice for the community to make |
+| Server detail fields | Layout only, and validated against an allow-list |
+| News sync + channel ids | Reads public announcement channels; posts land as drafts |
+| Welcome images + channel | Shows images the bot already posted publicly |
 
 A save applies immediately and drops only the caches whose inputs moved — a
 store-URL edit does not throw away a warm FiveM poll.

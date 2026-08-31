@@ -15,6 +15,20 @@
 
     const { $, html, render, api, safeHref, formatNumber, timeAgo } = E;
 
+    const DETAIL_LABELS = {
+        gametype: 'النمط',
+        mapname: 'الخريطة',
+        projectName: 'اسم المشروع',
+        projectDesc: 'الوصف',
+        tags: 'الوسوم',
+        locale: 'اللغة',
+        enforceGameBuild: 'إصدار اللعبة',
+        onesync: 'OneSync',
+        resourceCount: 'عدد الموارد',
+        serverVersion: 'إصدار السيرفر',
+        upvotes: 'التصويتات'
+    };
+
     /* ------------------------- live server ------------------------- */
 
     const STATUS_LABELS = {
@@ -62,10 +76,66 @@
         $('#serverMap').textContent = stats.mapname || '—';
 
         const note = $('#serverNote');
-        if (!note) return;
-        note.textContent = stats.online
-            ? 'افتح اللعبة واضغط «انضم إلى السيرفر» للدخول مباشرة.'
-            : (OFFLINE_NOTES[stats.reason] || OFFLINE_NOTES.unreachable);
+        if (note) {
+            note.textContent = stats.online
+                ? 'افتح اللعبة واضغط «انضم إلى السيرفر» للدخول مباشرة.'
+                : (OFFLINE_NOTES[stats.reason] || OFFLINE_NOTES.unreachable);
+        }
+
+        paintDetails(stats);
+    }
+
+    /**
+     * The "show more" panel.
+     *
+     * Both the button and the panel stay hidden unless there is something to
+     * put in them — an admin can select fields the server does not report,
+     * and a panel of empty rows reads as broken rather than as "not
+     * configured".
+     */
+    function paintDetails(stats) {
+        const button = $('#serverMoreBtn');
+        const panel = $('#serverMore');
+        if (!button || !panel) return;
+
+        const details = stats.details || {};
+        const rows = Object.keys(DETAIL_LABELS)
+            .filter(key => details[key] !== undefined && details[key] !== '')
+            .map(key => html`
+                <div>
+                    <dt>${DETAIL_LABELS[key]}</dt>
+                    <dd>${String(details[key])}</dd>
+                </div>`);
+
+        render('#serverDetails', html`${rows}`);
+
+        // Names only. Identifiers never leave the server (lib/fivem.js), so
+        // there is nothing here to strip a second time.
+        const players = Array.isArray(stats.playerList) ? stats.playerList : [];
+        const list = $('#serverPlayerList');
+        if (players.length) {
+            render(list, html`${players.map(player => html`
+                <span class="player">${player.name}</span>`)}`);
+            list.hidden = false;
+        } else {
+            list.hidden = true;
+        }
+
+        const hasContent = rows.length > 0 || players.length > 0;
+        button.hidden = !hasContent;
+        if (!hasContent) {
+            panel.hidden = true;
+            button.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function toggleDetails() {
+        const button = $('#serverMoreBtn');
+        const panel = $('#serverMore');
+        const open = button.getAttribute('aria-expanded') === 'true';
+        button.setAttribute('aria-expanded', String(!open));
+        panel.hidden = open;
+        button.textContent = open ? 'عرض المزيد' : 'إخفاء التفاصيل';
     }
 
     async function loadServer() {
@@ -175,6 +245,26 @@
         }
     }
 
+    /* ------------------------ welcome images ------------------------ */
+
+    async function loadWelcome() {
+        const wrap = $('#welcome');
+        if (!wrap) return;
+        try {
+            const data = await api('/api/discord/welcome');
+            if (!data.available || !data.images || !data.images.length) return;
+
+            // Images only, as asked: no names, no handles, no timestamps.
+            // alt is empty because these are decorative here — a screen
+            // reader announcing ten unlabelled avatars adds nothing.
+            render('#welcomeRow', html`${data.images.map(image => html`
+                <img class="welcome-img" src="${safeHref(image.url)}" alt="" loading="lazy">`)}`);
+            wrap.hidden = false;
+        } catch {
+            // Stays hidden.
+        }
+    }
+
     /* ----------------------------- boot ----------------------------- */
 
     function init() {
@@ -182,10 +272,14 @@
         E.initReveal();
 
         // Settled independently on purpose — see the file header.
+        const moreBtn = $('#serverMoreBtn');
+        if (moreBtn) moreBtn.addEventListener('click', toggleDetails);
+
         loadServer();
         loadNews();
         loadStore();
         loadDiscord();
+        loadWelcome();
 
         // The board is the one panel worth keeping current while someone
         // reads the page. It matches the server-side cache, so a visitor

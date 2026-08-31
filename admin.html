@@ -142,19 +142,84 @@
 
             <div class="panel">
                 <div class="panel-head">
-                    <h2 class="modal-title">إعدادات لا تُعدَّل من هنا</h2>
+                    <h2 class="modal-title">تفاصيل السيرفر</h2>
                 </div>
                 <p class="field-hint">
-                    هذه تُضبط في <span class="hint-mono">/etc/enclave-home.env</span> وتحتاج وصول للخادم.
-                    الأسرار ومن يملك صلاحية الإدارة تحديداً — لأن صفحة إعدادات تقدر تكتبها
-                    تقدر تقرأها، وجلسة إدارة واحدة مخترقة تكفي عندها للوصول لكل شيء.
+                    اختر المعلومات اللي تظهر تحت زر «عرض المزيد» في لوحة حالة السيرفر.
+                    الحقول اللي ما يرسلها السيرفر ما تظهر حتى لو مختارة.
                 </p>
-                <div class="table-wrap">
+                <div class="detail-fields" id="detailFields"></div>
+            </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="modal-title">أخبار من ديسكورد</h2>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="sNewsSync" name="newsSyncEnabled">
+                    <label for="sNewsSync">
+                        <span class="checkbox-title">جلب الأخبار تلقائياً من ديسكورد</span>
+                        <span class="checkbox-note">
+                            كل رسالة جديدة تُحفظ <strong>كمسودة</strong> — ما تظهر للزوار
+                            حتى تنشرها أنت من قائمة الأخبار. وإذا انحذفت الرسالة من ديسكورد،
+                            تنحذف المسودة معها.
+                        </span>
+                    </label>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="sNewsChannels">معرّفات القنوات</label>
+                    <textarea class="textarea" id="sNewsChannels" name="newsChannelIds"
+                              rows="4" dir="ltr" placeholder="1536824170720133150&#10;1536823820529311824"></textarea>
+                    <p class="field-hint">
+                        معرّف في كل سطر (أو مفصولة بفواصل). البوت لازم يقدر يقرأ كل قناة —
+                        صلاحيتَي View Channel و Read Message History.
+                    </p>
+                </div>
+
+                <div class="card-actions">
+                    <button class="btn btn-ghost btn-sm" type="button" id="syncNow">مزامنة الآن</button>
+                    <span class="field-hint" id="syncMeta"></span>
+                </div>
+
+                <div class="table-wrap" id="syncStatusWrap" hidden>
                     <table class="table">
-                        <tbody id="lockedRows"></tbody>
+                        <thead>
+                            <tr>
+                                <th scope="col">القناة</th>
+                                <th scope="col">الحالة</th>
+                                <th scope="col">جديد</th>
+                                <th scope="col">محذوف</th>
+                            </tr>
+                        </thead>
+                        <tbody id="syncRows"></tbody>
                     </table>
                 </div>
             </div>
+
+            <div class="panel">
+                <div class="panel-head">
+                    <h2 class="modal-title">صور الترحيب</h2>
+                </div>
+
+                <div class="checkbox-row">
+                    <input type="checkbox" id="sWelcome" name="showWelcomeImages">
+                    <label for="sWelcome">
+                        <span class="checkbox-title">عرض آخر 10 صور ترحيب</span>
+                        <span class="checkbox-note">
+                            الصور فقط في قسم المجتمع — بدون أسماء ولا نصوص.
+                        </span>
+                    </label>
+                </div>
+
+                <div class="field">
+                    <label class="label" for="sWelcomeChannel">معرّف قناة الترحيب</label>
+                    <input class="input" id="sWelcomeChannel" name="welcomeChannelId"
+                           dir="ltr" placeholder="1535680054804217866">
+                </div>
+            </div>
+
         </form>
     </main>
 </div>

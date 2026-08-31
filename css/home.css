@@ -318,3 +318,100 @@
 @media (max-width: 360px) {
     .brand-name { display: none; }
 }
+
+/* ---------------------------------------------------------------
+   Server details panel
+--------------------------------------------------------------- */
+
+.board-more { align-self: flex-start; }
+
+.board-details {
+    padding-block-start: var(--space-4);
+    border-block-start: 1px solid var(--border-subtle);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+/* The details list can carry a long description, so unlike the summary
+   row above it wraps rather than staying on one line. */
+.board-details .board-meta dd {
+    font-family: var(--font-body);
+    overflow-wrap: anywhere;
+}
+
+.players {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.player {
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    font-size: var(--text-xs);
+    color: var(--text-secondary);
+    max-inline-size: 18ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------
+   Welcome images
+
+   Images only — the row carries no names, so it needs no text styling.
+   A fixed square keeps a mixed bag of card sizes on one clean line.
+--------------------------------------------------------------- */
+
+.welcome { margin-block-start: var(--space-5); }
+
+.welcome-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-block-end: var(--space-3);
+}
+
+.welcome-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.welcome-img {
+    inline-size: 44px;
+    block-size: 44px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--surface-inset);
+    border: 1px solid var(--border-strong);
+}
+
+/* ---------------------------------------------------------------
+   Admin: detail-field picker
+--------------------------------------------------------------- */
+
+.detail-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: var(--space-2);
+    margin-block-start: var(--space-3);
+}
+
+.detail-field {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: var(--text-sm);
+    cursor: pointer;
+}
+.detail-field:hover { border-color: var(--border-strong); }
+.detail-field input { accent-color: var(--accent-deep); cursor: pointer; }
