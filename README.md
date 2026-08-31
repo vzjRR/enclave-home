@@ -55,6 +55,7 @@ backend gives that guarantee up unless the pages are built to not need it.
 | Section | Source | Cached |
 |---|---|---|
 | Live server | `cfx.re/join/<code>` → `x-citizenfx-url` → the server's `/dynamic.json` and `/players.json`, with the Cfx.re listing API as a fallback | 30 s |
+| Player position mini-map | The same server, `/enclave-positions/positions.json` — a companion FXServer resource, not a Cfx.re endpoint (see below) | 30 s |
 | Discord | `GET /guilds/{id}?with_counts=true` with a bot token, falling back to `GET /invites/{code}?with_counts=true` with no auth at all | 60 s |
 | Store | `GET /api/store` on the store — its existing public catalogue, sorted by `createdAt` | 120 s |
 | News | `news.json` in `DATA_DIR`, written by the admin console | in-process |
@@ -76,6 +77,14 @@ hardcoded, so the site follows the server if its IP changes.
   off entirely unless `FIVEM_PUBLISH_PLAYER_LIST=true`.
 - **The game server's address.** It is resolved and used server-side; it is
   not in any browser-reachable payload.
+- **A player identity on the position mini-map.** `fivem-resource/
+  enclave-positions/` — a small FXServer resource the operator installs
+  separately, documented in its own README — publishes `{x, y}` only, no
+  name and no player id. The map and the player-name list
+  (`FIVEM_PUBLISH_PLAYER_LIST`) are independent toggles on purpose: a shared
+  id between the two would let anyone turn both on and match a dot to a name
+  by cross-referencing it, which would defeat the point of publishing
+  positions without names in the first place.
 - **A closed store's catalogue.** The store withholds its inventory while
   shut, on purpose — a scraper should not be able to read the whole
   catalogue out of a shop showing a maintenance notice. This site reads that
@@ -144,6 +153,7 @@ its payment details — so there is never a question of which is authoritative.
 | Discord invite code | Worst case is a dead invite |
 | Store URL | Validated `https://` only, so it cannot become a stored redirect |
 | Publish player list | A visibility choice for the community to make |
+| Publish player position map | Positions only, no name/id (see above); a no-op until `enclave-positions` is installed |
 | Server detail fields | Layout only, and validated against an allow-list |
 | News sync + channel ids | Reads public announcement channels; posts land as drafts |
 | Welcome images + channel | Shows images the bot already posted publicly |

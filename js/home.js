@@ -38,6 +38,36 @@
         unknown: 'غير معروف'
     };
 
+    /**
+     * GTA V's world coordinates, approximately -- not to scale, just enough
+     * to place a dot roughly where a player is relative to the others. The
+     * mini-map is deliberately an abstract radar rather than the game's own
+     * map art (no licensed source for that), so exactness doesn't matter.
+     */
+    const MAP_BOUNDS = { minX: -4500, maxX: 4500, minY: -4500, maxY: 8000 };
+    const MAP_VIEW_W = 100;
+    const MAP_VIEW_H = 139; // matches the index.html viewBox's aspect ratio
+
+    // The radar panel (css/home.css .player-map-radar) clips to a rounded
+    // rect. A dot plotted right at 0/100 on either axis -- which is exactly
+    // where a clamped out-of-bounds position lands -- sits inside that
+    // rounded corner and gets clipped away entirely, silently. Keeping the
+    // plotted range 5% inset from every edge keeps every dot, including a
+    // clamped one, clear of the corners regardless of how round they are.
+    const MAP_MARGIN = 0.05;
+
+    /** A world position -> a point inside the radar's viewBox, clamped. */
+    function mapPoint(pos) {
+        const x = Math.min(Math.max(Number(pos.x) || 0, MAP_BOUNDS.minX), MAP_BOUNDS.maxX);
+        const y = Math.min(Math.max(Number(pos.y) || 0, MAP_BOUNDS.minY), MAP_BOUNDS.maxY);
+        const nx = (x - MAP_BOUNDS.minX) / (MAP_BOUNDS.maxX - MAP_BOUNDS.minX);
+        // North (larger in-game y) should read as "up", i.e. a smaller SVG y.
+        const ny = 1 - (y - MAP_BOUNDS.minY) / (MAP_BOUNDS.maxY - MAP_BOUNDS.minY);
+        const cx = (MAP_MARGIN + nx * (1 - 2 * MAP_MARGIN)) * MAP_VIEW_W;
+        const cy = (MAP_MARGIN + ny * (1 - 2 * MAP_MARGIN)) * MAP_VIEW_H;
+        return { cx: cx.toFixed(1), cy: cy.toFixed(1) };
+    }
+
     /** Why the board is empty, in words a player can act on. */
     const OFFLINE_NOTES = {
         'not-configured': 'لم يتم ربط السيرفر بالموقع بعد.',
@@ -121,12 +151,38 @@
             list.hidden = true;
         }
 
-        const hasContent = rows.length > 0 || players.length > 0;
+        const hasMap = paintPlayerMap(stats);
+
+        const hasContent = rows.length > 0 || players.length > 0 || hasMap;
         button.hidden = !hasContent;
         if (!hasContent) {
             panel.hidden = true;
             button.setAttribute('aria-expanded', 'false');
         }
+    }
+
+    /**
+     * Positions only, from the enclave-positions FiveM resource -- no
+     * names, no ids (see lib/fivem.js's publicPosition() for why). Returns
+     * whether there was anything to plot, so paintDetails() can fold it
+     * into whether the "show more" button has a reason to exist.
+     */
+    function paintPlayerMap(stats) {
+        const wrap = $('#serverPlayerMap');
+        if (!wrap) return false;
+
+        const positions = Array.isArray(stats.playerMap) ? stats.playerMap : [];
+        if (!positions.length) {
+            wrap.hidden = true;
+            return false;
+        }
+
+        render('#playerMapDots', html`${positions.map(pos => {
+            const { cx, cy } = mapPoint(pos);
+            return html`<circle class="player-map-dot" cx="${cx}" cy="${cy}" r="1.6"></circle>`;
+        })}`);
+        wrap.hidden = false;
+        return true;
     }
 
     function toggleDetails() {

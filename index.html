@@ -131,6 +131,19 @@
             <div class="board-details" id="serverMore" hidden>
                 <dl class="board-meta" id="serverDetails"></dl>
                 <div class="players" id="serverPlayerList" hidden></div>
+
+                <!-- Positions only, from the enclave-positions FiveM resource --
+                     no names, no ids. Hidden unless there is data to plot. -->
+                <div class="player-map" id="serverPlayerMap" hidden>
+                    <p class="player-map-label">مواقع اللاعبين (تقريبية)</p>
+                    <svg class="player-map-radar" viewBox="0 0 100 139" role="img"
+                         aria-label="خريطة تقريبية لمواقع اللاعبين المتصلين">
+                        <circle class="player-map-ring" cx="50" cy="69.5" r="60"></circle>
+                        <circle class="player-map-ring" cx="50" cy="69.5" r="40"></circle>
+                        <circle class="player-map-ring" cx="50" cy="69.5" r="20"></circle>
+                        <g id="playerMapDots"></g>
+                    </svg>
+                </div>
             </div>
         </div>
     </div>
