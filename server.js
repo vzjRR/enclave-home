@@ -77,6 +77,7 @@ const settings = new Settings(DATA_DIR, {
     discordInviteCode: process.env.DISCORD_INVITE_CODE || '',
     storeUrl: process.env.STORE_URL || process.env.STORE_API_BASE || 'https://store.enclaverp.cc',
     publishPlayerList: process.env.FIVEM_PUBLISH_PLAYER_LIST === 'true',
+    publishPlayerMap: process.env.FIVEM_PUBLISH_PLAYER_MAP === 'true',
     newsChannelIds: (process.env.DISCORD_NEWS_CHANNEL_IDS || '')
         .split(/[\s,]+/).filter(Boolean),
     welcomeChannelId: process.env.DISCORD_WELCOME_CHANNEL_ID || ''
@@ -395,7 +396,8 @@ async function handleApi(req, res, pathname, url) {
     if (method === 'GET' && pathname === '/api/server') {
         const config = settings.current();
         const stats = await fivem.getStats(joinCode(), {
-            publishPlayers: config.publishPlayerList
+            publishPlayers: config.publishPlayerList,
+            publishMap: config.publishPlayerMap
         });
 
         // Only the rows an admin chose to show leave the server. Filtering
@@ -561,7 +563,7 @@ async function handleApi(req, res, pathname, url) {
             // every save would turn a typo-and-fix into four needless
             // upstream round trips.
             if (changed.includes('fivemJoinCode') || changed.includes('publishPlayerList')
-                || changed.includes('serverDetailFields')) {
+                || changed.includes('publishPlayerMap') || changed.includes('serverDetailFields')) {
                 fivem.resetCache();
             }
             if (changed.includes('discordInviteCode')) discordStats.resetCache();

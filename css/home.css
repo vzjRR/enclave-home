@@ -365,6 +365,52 @@
 }
 
 /* ---------------------------------------------------------------
+   Player position mini-map
+
+   An abstract radar, not the game's own map art -- there is no licensed
+   source for that here. Positions come from the enclave-positions FiveM
+   resource with no name or id attached (js/home.js's mapPoint()/
+   lib/fivem.js's publicPosition()), so this panel plots dots only.
+--------------------------------------------------------------- */
+
+.player-map { margin-block-start: var(--space-2); }
+
+.player-map-label {
+    font-size: var(--text-xs);
+    color: var(--text-muted);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    margin-block-end: var(--space-3);
+}
+
+.player-map-radar {
+    display: block;
+    inline-size: 100%;
+    max-inline-size: 220px;
+    margin-inline: auto;
+    aspect-ratio: 100 / 139;
+    overflow: hidden;
+    border-radius: var(--radius-lg);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+}
+
+.player-map-ring {
+    fill: none;
+    stroke: var(--border-subtle);
+    stroke-width: 0.5;
+}
+
+.player-map-dot {
+    fill: var(--accent-strong);
+    animation: status-pulse 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .player-map-dot { animation: none; }
+}
+
+/* ---------------------------------------------------------------
    Welcome images
 
    Images only — the row carries no names, so it needs no text styling.

@@ -54,7 +54,8 @@ const stubState = {
     welcomeMessages: [],
     playersCalls: 0,
     dynamicCalls: 0,
-    discordCalls: 0
+    discordCalls: 0,
+    positionsCalls: 0
 };
 
 function createStub() {
@@ -116,6 +117,16 @@ function createStub() {
                     'ip:203.0.113.9'
                 ]
             }]);
+        }
+
+        if (url.pathname === '/enclave-positions/positions.json') {
+            stubState.positionsCalls++;
+            if (!stubState.serverUp) return json(500, {});
+            // Extra fields on purpose, to prove the server strips down to
+            // {x, y} -- especially "name", which must never ride along.
+            return json(200, stubState.positions ?? [
+                { x: 120.6, y: -340.2, name: 'Ahmed', id: 3 }
+            ]);
         }
 
         // Cfx.re listing API — unlisted server.
@@ -566,6 +577,38 @@ async function main() {
         // operator ends up ticking the obvious box and seeing nothing.
         eq(detailed.json.playerList.length, 1,
             'player list follows publishPlayerList, not the detail picker');
+
+        /* ------------------------ position map ------------------------ */
+
+        // publishPlayerMap wasn't set in the save above, so it's false —
+        // confirm nothing is fetched and the field is simply empty.
+        eq(detailed.json.playerMap.length, 0, 'position map is empty while its setting is off');
+        const positionsCallsBeforeEnable = stubState.positionsCalls;
+
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['projectName', 'resourceCount'], publishPlayerMap: true
+        });
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        const mapOn = await request(base, '/api/server');
+        eq(mapOn.json.playerMap.length, 1, 'a position is returned once the setting is on');
+        eq(mapOn.json.playerMap[0].x, 120.6, 'x coordinate survives');
+        eq(mapOn.json.playerMap[0].y, -340.2, 'y coordinate survives');
+        eq(Object.keys(mapOn.json.playerMap[0]).sort().join(','), 'x,y',
+            'no name or id rides along with a position, even though the stub sent both');
+        ok(stubState.positionsCalls > positionsCallsBeforeEnable,
+            'positions.json is only fetched once the setting is on');
+
+        // A malformed response (e.g. a half-written file) must degrade to
+        // an empty list rather than throwing or leaking whatever shape it was.
+        stubState.positions = { not: 'an array' };
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const mapBadShape = await request(base, '/api/server');
+        eq(mapBadShape.json.playerMap.length, 0,
+            'a non-array positions response degrades to empty, not an error');
+        stubState.positions = undefined;
 
         /* ------------------ discord welcome images ------------------ */
 

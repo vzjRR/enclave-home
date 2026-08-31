@@ -210,6 +210,7 @@
         $('#sInvite').value = settings.discordInviteCode || '';
         $('#sStore').value = settings.storeUrl || '';
         $('#sPlayers').checked = settings.publishPlayerList === true;
+        $('#sPlayerMap').checked = settings.publishPlayerMap === true;
         $('#sNewsSync').checked = settings.newsSyncEnabled === true;
         $('#sNewsChannels').value = (settings.newsChannelIds || []).join('\n');
         $('#sWelcome').checked = settings.showWelcomeImages === true;
@@ -295,6 +296,7 @@
                     discordInviteCode: $('#sInvite').value.trim(),
                     storeUrl: $('#sStore').value.trim(),
                     publishPlayerList: $('#sPlayers').checked,
+                    publishPlayerMap: $('#sPlayerMap').checked,
                     serverDetailFields: $$('#detailFields input:checked').map(box => box.value),
                     newsSyncEnabled: $('#sNewsSync').checked,
                     newsChannelIds: $('#sNewsChannels').value.split(/[\s,]+/).filter(Boolean),
