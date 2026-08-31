@@ -268,10 +268,14 @@
                 // scrollable strip instead, so it isn't shown twice.
                 render(row, html`${cards}`);
             } else {
-                // ~2.5s per card keeps the strip's speed steady whether
+                // ~3.5s per card keeps the strip's speed steady whether
                 // there are 3 images or 10, rather than a fixed duration
-                // that crawls or races depending on count.
-                row.style.setProperty('--welcome-dur', `${Math.max(cards.length * 2.5, 10)}s`);
+                // that crawls or races depending on count. Scaled up from
+                // the original 2.5s/10s floor to match the larger cards
+                // (144px tall, up to 320px wide vs. the old 220px cap) --
+                // otherwise the same duration now covers more pixels and
+                // the loop visibly speeds up.
+                row.style.setProperty('--welcome-dur', `${Math.max(cards.length * 3.5, 14)}s`);
                 render(row, html`${cards}${cards}`);
             }
             wrap.hidden = false;
