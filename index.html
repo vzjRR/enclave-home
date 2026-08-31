@@ -120,6 +120,18 @@
             <p class="board-note" id="serverNote">
                 افتح اللعبة واضغط «انضم إلى السيرفر» للدخول مباشرة.
             </p>
+
+            <!-- Hidden until js/home.js finds detail rows to put in it. A
+                 button that expands nothing is worse than no button. -->
+            <button class="btn btn-quiet btn-sm board-more" type="button"
+                    id="serverMoreBtn" aria-expanded="false" aria-controls="serverMore" hidden>
+                عرض المزيد
+            </button>
+
+            <div class="board-details" id="serverMore" hidden>
+                <dl class="board-meta" id="serverDetails"></dl>
+                <div class="players" id="serverPlayerList" hidden></div>
+            </div>
         </div>
     </div>
 </section>
@@ -179,6 +191,13 @@
                     <div class="stat-value" id="discordOnline">—</div>
                     <div class="stat-label">متصل الآن</div>
                 </div>
+            </div>
+
+            <!-- Newest members, as the welcome cards the bot already posts.
+                 Images only — no names. Hidden until there are any. -->
+            <div class="welcome" id="welcome" hidden>
+                <p class="welcome-label">آخر الأعضاء</p>
+                <div class="welcome-row" id="welcomeRow"></div>
             </div>
         </div>
         <a class="btn btn-primary" href="/discord" target="_blank" rel="noopener">

@@ -27,7 +27,9 @@ const discordStats = require('./lib/discordStats');
 const fivem = require('./lib/fivem');
 const storeFeed = require('./lib/storeFeed');
 const { News } = require('./lib/news');
-const { Settings } = require('./lib/settings');
+const { Settings, DETAIL_FIELDS } = require('./lib/settings');
+const discordNews = require('./lib/discordNews');
+const discordWelcome = require('./lib/discordWelcome');
 const { createOauth } = require('./lib/oauth');
 const {
     SECURITY_HEADERS, readJsonBody, sendJson, sendError, parseCookies, buildCookie
@@ -74,7 +76,10 @@ const settings = new Settings(DATA_DIR, {
     fivemJoinCode: process.env.FIVEM_JOIN_CODE || '',
     discordInviteCode: process.env.DISCORD_INVITE_CODE || '',
     storeUrl: process.env.STORE_URL || process.env.STORE_API_BASE || 'https://store.enclaverp.cc',
-    publishPlayerList: process.env.FIVEM_PUBLISH_PLAYER_LIST === 'true'
+    publishPlayerList: process.env.FIVEM_PUBLISH_PLAYER_LIST === 'true',
+    newsChannelIds: (process.env.DISCORD_NEWS_CHANNEL_IDS || '')
+        .split(/[\s,]+/).filter(Boolean),
+    welcomeChannelId: process.env.DISCORD_WELCOME_CHANNEL_ID || ''
 });
 
 const joinCode = () => settings.current().fivemJoinCode;
@@ -96,6 +101,45 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
  * exactly when a deploy changes an asset and not otherwise.
  */
 let ASSET_VERSION = 'dev';
+
+/**
+ * Outcome of the most recent Discord news sync, surfaced in the admin
+ * console. Without it a channel the bot cannot read fails silently on a
+ * timer, and the only symptom is news that never arrives.
+ */
+let lastSync = null;
+let syncInFlight = null;
+
+const NEWS_SYNC_INTERVAL_MS = 5 * 60 * 1000;
+
+async function runNewsSync() {
+    const config = settings.current();
+    if (!config.newsSyncEnabled) {
+        lastSync = { ok: false, reason: 'disabled', channels: [], syncedAt: new Date().toISOString() };
+        return lastSync;
+    }
+    // One at a time. The timer and a settings save can both ask for a sync,
+    // and two concurrent runs would race to create the same drafts.
+    if (syncInFlight) return syncInFlight;
+
+    syncInFlight = discordNews.sync({
+        token: DISCORD_BOT_TOKEN,
+        channelIds: config.newsChannelIds,
+        news
+    }).then(result => {
+        lastSync = result;
+        return result;
+    }).catch(error => {
+        lastSync = {
+            ok: false, reason: 'error', channels: [],
+            syncedAt: new Date().toISOString()
+        };
+        console.error('[enclave-home] news sync failed', error);
+        return lastSync;
+    }).finally(() => { syncInFlight = null; });
+
+    return syncInFlight;
+}
 
 const news = new News(DATA_DIR);
 
@@ -349,10 +393,45 @@ async function handleApi(req, res, pathname, url) {
     /* ---- live FiveM stats ---- */
 
     if (method === 'GET' && pathname === '/api/server') {
+        const config = settings.current();
         const stats = await fivem.getStats(joinCode(), {
-            publishPlayers: settings.current().publishPlayerList
+            publishPlayers: config.publishPlayerList
         });
-        return sendJson(res, 200, stats, { cacheSeconds: 30 });
+
+        // Only the rows an admin chose to show leave the server. Filtering
+        // here rather than in the browser means an unselected field is
+        // genuinely absent, not merely hidden by CSS.
+        const chosen = new Set(config.serverDetailFields);
+        const details = {};
+        for (const [key, value] of Object.entries(stats.details || {})) {
+            if (chosen.has(key)) details[key] = value;
+        }
+
+        // The player list rides on its own setting, not on the detail
+        // picker -- see the note in lib/settings.js.
+        return sendJson(res, 200, {
+            ...stats,
+            details,
+            detailFields: config.serverDetailFields
+        }, { cacheSeconds: 30 });
+    }
+
+    /* ---- Discord welcome images ---- */
+
+    if (method === 'GET' && pathname === '/api/discord/welcome') {
+        const config = settings.current();
+        if (!config.showWelcomeImages) {
+            return sendJson(res, 200, { available: false, reason: 'disabled', images: [] },
+                { cacheSeconds: 60 });
+        }
+        const payload = await discordWelcome.getImages({
+            token: DISCORD_BOT_TOKEN,
+            channelId: config.welcomeChannelId
+        });
+        // Matches the module's own TTL: the attachment URLs in here are
+        // signed and expire, so a longer shared cache would hand visitors
+        // links that have already gone stale.
+        return sendJson(res, 200, payload, { cacheSeconds: 300 });
     }
 
     /* ---- Discord community stats ---- */
@@ -468,17 +547,8 @@ async function handleApi(req, res, pathname, url) {
         if (method === 'GET') {
             return sendJson(res, 200, {
                 settings: settings.current(),
-                // Shown read-only in the console so an operator can see what
-                // is configured without being able to change it here, and
-                // knows to reach for the env file rather than hunting for a
-                // field that does not exist.
-                locked: {
-                    guildId: DISCORD_GUILD_ID,
-                    storeApiBase: STORE_API_BASE,
-                    publicBaseUrl: PUBLIC_BASE_URL,
-                    discordSignIn: oauth.configured,
-                    botToken: Boolean(DISCORD_BOT_TOKEN)
-                }
+                detailFields: DETAIL_FIELDS,
+                lastSync
             });
         }
 
@@ -490,14 +560,32 @@ async function handleApi(req, res, pathname, url) {
             // not throw away a warm FiveM poll, and clearing everything on
             // every save would turn a typo-and-fix into four needless
             // upstream round trips.
-            if (changed.includes('fivemJoinCode') || changed.includes('publishPlayerList')) {
+            if (changed.includes('fivemJoinCode') || changed.includes('publishPlayerList')
+                || changed.includes('serverDetailFields')) {
                 fivem.resetCache();
             }
             if (changed.includes('discordInviteCode')) discordStats.resetCache();
             if (changed.includes('storeUrl')) storeFeed.resetCache();
+            if (changed.includes('welcomeChannelId') || changed.includes('showWelcomeImages')) {
+                discordWelcome.resetCache();
+            }
+
+            // Picking channels should show a result now, not in five
+            // minutes -- otherwise there is no way to tell a permission
+            // problem from a slow timer.
+            if (changed.includes('newsChannelIds') || changed.includes('newsSyncEnabled')) {
+                runNewsSync().catch(() => {});
+            }
 
             return sendJson(res, 200, { settings: saved, changed });
         }
+    }
+
+    if (method === 'POST' && pathname === '/api/admin/news/sync') {
+        const user = requireStaff(req, res);
+        if (!user) return undefined;
+        if (!requireCsrf(req, res)) return undefined;
+        return sendJson(res, 200, await runNewsSync());
     }
 
     /* ---- news, admin ---- */
@@ -716,6 +804,14 @@ async function start() {
         oauth.sweep();
     }, 10 * 60 * 1000);
     sweeper.unref();
+
+    // Sync on a timer, and once shortly after boot so a restart picks up
+    // anything posted while the service was down.
+    if (settings.current().newsSyncEnabled) {
+        setTimeout(() => runNewsSync().catch(() => {}), 10 * 1000).unref();
+    }
+    const syncTimer = setInterval(() => runNewsSync().catch(() => {}), NEWS_SYNC_INTERVAL_MS);
+    syncTimer.unref();
 
     server.listen(PORT, BIND_HOST, () => {
         console.log(`enclave-home listening on http://${BIND_HOST}:${PORT}`);

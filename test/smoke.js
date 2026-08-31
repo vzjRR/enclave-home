@@ -50,6 +50,8 @@ function eq(actual, expected, label) {
 const stubState = {
     serverUp: true,
     storeOpen: true,
+    newsMessages: [],
+    welcomeMessages: [],
     playersCalls: 0,
     dynamicCalls: 0,
     discordCalls: 0
@@ -83,6 +85,21 @@ function createStub() {
             });
         }
 
+        if (url.pathname === '/info.json') {
+            if (!stubState.serverUp) return json(500, {});
+            return json(200, {
+                server: 'FXServer-master v1.0.0',
+                resources: ['a', 'b', 'c'],
+                vars: {
+                    sv_projectName: 'ENCLAVE RP',
+                    sv_projectDesc: 'مدينة رول بلاي',
+                    tags: 'roleplay, arabic',
+                    locale: 'ar-SA',
+                    onesync_enabled: 'true'
+                }
+            });
+        }
+
         if (url.pathname === '/players.json') {
             stubState.playersCalls++;
             if (!stubState.serverUp) return json(500, {});
@@ -111,6 +128,17 @@ function createStub() {
                 approximate_presence_count: 41,
                 guild: { name: 'ENCLAVE RP' }
             });
+        }
+
+        // Discord channel reads, for the news sync and welcome images.
+        const channel = /^\/channels\/(\d+)\/messages$/.exec(url.pathname);
+        if (channel) {
+            const id = channel[1];
+            if (id === '900000000000000001') return json(403, {});
+            if (id === '900000000000000009') {
+                return json(200, stubState.welcomeMessages);
+            }
+            return json(200, stubState.newsMessages);
         }
 
         if (url.pathname === '/api/store') {
@@ -206,6 +234,7 @@ async function waitForServer(base, attempts = 60) {
 /* -------------------------------- run -------------------------------- */
 
 const TOTP_SECRET = 'JBSWY3DPEHPK3PXP';
+const BOT_TOKEN = 'MTQxMS.stub.tokenvalue';
 
 async function main() {
     const stub = await createStub();
@@ -232,6 +261,7 @@ async function main() {
             DISCORD_API_BASE: stubBase,
             DISCORD_INVITE_CODE: 'testinvite',
             DISCORD_GUILD_ID: '123',
+            DISCORD_BOT_TOKEN: BOT_TOKEN,
             STORE_API_BASE: stubBase,
             STORE_URL: 'https://store.example.test'
         },
@@ -457,14 +487,18 @@ async function main() {
         eq(seeded.json.settings.fivemJoinCode, 'testcode', 'seeded from the environment');
         eq(seeded.json.settings.publishPlayerList, true, 'player-list seed carried through');
 
-        // The locked block tells the operator what exists without handing
-        // it over. A regression here leaks a bot token into a web page.
-        ok('botToken' in seeded.json.locked, 'locked block reports the bot token');
-        eq(typeof seeded.json.locked.botToken, 'boolean',
-            'bot token reported as a boolean, never its value');
-        const lockedText = JSON.stringify(seeded.json.locked);
-        ok(!lockedText.includes('secret') && !lockedText.includes('SECRET'),
-            'no secret material in the locked block');
+        // Whatever the settings endpoint returns, it must never carry the
+        // credentials the service holds. The read-only panel that used to
+        // list them is gone, and this is what keeps it gone.
+        const settingsText = JSON.stringify(seeded.json);
+        for (const secret of [BOT_TOKEN, TOTP_SECRET, 'CLIENT_SECRET']) {
+            ok(!settingsText.includes(secret),
+                `settings response carries no ${secret === BOT_TOKEN ? 'bot token' : 'secret'}`);
+        }
+        ok(Array.isArray(seeded.json.detailFields) && seeded.json.detailFields.length,
+            'the endpoint offers the selectable detail fields');
+        ok(!seeded.json.detailFields.includes('playerList'),
+            'the player list is not a detail field — it has its own setting');
 
         const putSettings = body => request(base, '/api/admin/settings',
             { method: 'PUT', body, cookie, headers: { 'X-CSRF-Token': csrf } });
@@ -507,8 +541,125 @@ async function main() {
         // configured server rather than one this block broke.
         await putSettings({
             fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
-            storeUrl: 'https://store.example.test', publishPlayerList: true
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['gametype', 'mapname', 'resourceCount']
         });
+
+        /* --------------------- server details --------------------- */
+
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['projectName', 'resourceCount']
+        });
+        await new Promise(resolve => setTimeout(resolve, 400));
+
+        const detailed = await request(base, '/api/server');
+        eq(detailed.json.details.projectName, 'ENCLAVE RP', 'a chosen detail is returned');
+        eq(detailed.json.details.resourceCount, 3, 'resource count is counted from info.json');
+        ok(!('tags' in detailed.json.details),
+            'an unselected field is absent, not empty');
+        ok(!('locale' in detailed.json.details), 'only chosen fields are sent');
+
+        // The player list must not be gated behind the detail picker: it has
+        // its own setting, and two controls for one outcome is how an
+        // operator ends up ticking the obvious box and seeing nothing.
+        eq(detailed.json.playerList.length, 1,
+            'player list follows publishPlayerList, not the detail picker');
+
+        /* ------------------ discord welcome images ------------------ */
+
+        stubState.welcomeMessages = [
+            { id: '5', attachments: [{ url: 'https://cdn.test/a.png', content_type: 'image/png' }], embeds: [] },
+            { id: '4', content: 'no image here', attachments: [], embeds: [] },
+            { id: '3', attachments: [], embeds: [{ image: { url: 'https://cdn.test/b.png' } }] }
+        ];
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['projectName', 'resourceCount'],
+            welcomeChannelId: '900000000000000009', showWelcomeImages: true
+        });
+
+        const welcome = await request(base, '/api/discord/welcome');
+        eq(welcome.status, 200, 'welcome images respond');
+        eq(welcome.json.images.length, 2, 'messages without an image are skipped');
+        eq(welcome.json.images[0].url, 'https://cdn.test/a.png', 'attachment image used');
+        eq(welcome.json.images[1].url, 'https://cdn.test/b.png', 'embed image used as a fallback');
+
+        // Images only. A name or handle leaking in here is the whole thing
+        // the user asked to avoid.
+        const welcomeKeys = Object.keys(welcome.json.images[0]).sort().join(',');
+        eq(welcomeKeys, 'id,url', 'a welcome image carries only an id and a url');
+
+        /* ---------------------- discord news sync ---------------------- */
+
+        const message = (id, content) => ({
+            id, content, timestamp: '2026-08-01T00:00:00Z', attachments: [], embeds: []
+        });
+        stubState.newsMessages = [
+            message('300000000000000000', 'إعلان ثالث\nتفاصيل'),
+            message('200000000000000000', 'إعلان ثاني\nتفاصيل'),
+            message('100000000000000000', 'إعلان أول\nتفاصيل')
+        ];
+
+        const publicBefore = (await request(base, '/api/news')).json.posts.length;
+
+        const syncNow = () => request(base, '/api/admin/news/sync',
+            { method: 'POST', cookie, headers: { 'X-CSRF-Token': csrf } });
+
+        eq((await request(base, '/api/admin/news/sync', { method: 'POST' })).status, 401,
+            'unauthenticated sync rejected');
+
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['projectName'],
+            newsSyncEnabled: true,
+            newsChannelIds: ['900000000000000002']
+        });
+
+        const first = await syncNow();
+        eq(first.json.added, 3, 'three messages synced');
+
+        // Drafts, never published. This is the promise the whole feature
+        // rests on: nothing reaches the public site without a human.
+        eq((await request(base, '/api/news')).json.posts.length, publicBefore,
+            'synced posts are drafts and do not appear publicly');
+
+        eq((await syncNow()).json.added, 0, 're-syncing adds nothing');
+
+        // A message deleted in Discord removes its post.
+        stubState.newsMessages = [
+            message('300000000000000000', 'إعلان ثالث\nتفاصيل'),
+            message('100000000000000000', 'إعلان أول\nتفاصيل')
+        ];
+        eq((await syncNow()).json.removed, 1, 'a deleted message removes its post');
+
+        // The dangerous case: the window slides past old messages entirely.
+        // They are out of view, NOT deleted — without this check the first
+        // sync of a busy channel would wipe the archive.
+        stubState.newsMessages = [
+            message('900000000000000000', 'جديد\nتفاصيل')
+        ];
+        eq((await syncNow()).json.removed, 0,
+            'messages older than the fetch window are not treated as deleted');
+
+        const adminPosts = (await request(base, '/api/admin/news',
+            { cookie, headers: { 'X-CSRF-Token': csrf } })).json.posts;
+        ok(adminPosts.some(post => post.source === 'discord'), 'synced posts are marked');
+        ok(adminPosts.some(post => !post.source), 'hand-written posts survive the sync');
+
+        // A channel the bot cannot read reports itself instead of failing quietly.
+        await putSettings({
+            fivemJoinCode: 'testcode', discordInviteCode: 'testinvite',
+            storeUrl: 'https://store.example.test', publishPlayerList: true,
+            serverDetailFields: ['projectName'],
+            newsSyncEnabled: true, newsChannelIds: ['900000000000000001']
+        });
+        const denied = await syncNow();
+        eq(denied.json.channels[0].ok, false, 'a forbidden channel is reported');
+        eq(denied.json.channels[0].reason, 'no-access', 'and names the reason');
 
         /* ----------------------- upstream failures ----------------------- */
 

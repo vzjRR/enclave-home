@@ -174,38 +174,108 @@
 
     /* ----------------------------- settings ----------------------------- */
 
-    const LOCKED_LABELS = {
-        guildId: 'معرّف سيرفر ديسكورد',
-        storeApiBase: 'مصدر بيانات المتجر',
-        publicBaseUrl: 'عنوان الموقع',
-        discordSignIn: 'دخول ديسكورد',
-        botToken: 'توكن البوت'
+    const DETAIL_LABELS = {
+        gametype: 'النمط',
+        mapname: 'الخريطة',
+        projectName: 'اسم المشروع',
+        projectDesc: 'وصف السيرفر',
+        tags: 'الوسوم',
+        locale: 'اللغة',
+        enforceGameBuild: 'إصدار اللعبة',
+        onesync: 'OneSync',
+        resourceCount: 'عدد الموارد',
+        serverVersion: 'إصدار السيرفر',
+        upvotes: 'التصويتات'
     };
 
-    function lockedValue(key, value) {
-        // Booleans describe whether a credential is configured, never what
-        // it is — the server only ever sends the boolean for those.
-        if (typeof value === 'boolean') return value ? 'مضبوط' : 'غير مضبوط';
-        return value || '—';
-    }
+    const SYNC_REASONS = {
+        'no-access': 'البوت ما يقدر يقرأ القناة',
+        'not-found': 'القناة غير موجودة',
+        'rate-limited': 'تجاوز حد الطلبات',
+        unreachable: 'تعذّر الوصول',
+        error: 'خطأ',
+        disabled: 'المزامنة معطّلة',
+        'no-bot-token': 'ما فيه توكن بوت',
+        'no-channels': 'ما فيه قنوات محددة'
+    };
 
     async function loadSettings() {
-        const { settings, locked } = await api('/api/admin/settings');
+        const { settings, detailFields, lastSync } = await api('/api/admin/settings');
 
         $('#sJoin').value = settings.fivemJoinCode || '';
         $('#sInvite').value = settings.discordInviteCode || '';
         $('#sStore').value = settings.storeUrl || '';
         $('#sPlayers').checked = settings.publishPlayerList === true;
+        $('#sNewsSync').checked = settings.newsSyncEnabled === true;
+        $('#sNewsChannels').value = (settings.newsChannelIds || []).join('\n');
+        $('#sWelcome').checked = settings.showWelcomeImages === true;
+        $('#sWelcomeChannel').value = settings.welcomeChannelId || '';
+
+        // Built from the server's own list, so a field added later appears
+        // here without a matching edit in this file.
+        const chosen = new Set(settings.serverDetailFields || []);
+        render('#detailFields', html`${(detailFields || []).map(field => html`
+            <label class="detail-field">
+                <input type="checkbox" value="${field}" ${chosen.has(field) ? html`checked` : null}>
+                <span>${DETAIL_LABELS[field] || field}</span>
+            </label>`)}`);
 
         $('#settingsMeta').textContent = settings.updatedAt
             ? `آخر تعديل ${timeAgo(settings.updatedAt)}${settings.updatedBy ? ` — ${settings.updatedBy}` : ''}`
             : '';
 
-        render('#lockedRows', html`${Object.keys(LOCKED_LABELS).map(key => html`
+        paintSync(lastSync);
+    }
+
+    /** Per-channel sync outcome, so a permission problem is visible here. */
+    function paintSync(result) {
+        const wrap = $('#syncStatusWrap');
+        const meta = $('#syncMeta');
+        if (!result) {
+            wrap.hidden = true;
+            meta.textContent = 'لم تتم أي مزامنة بعد.';
+            return;
+        }
+
+        meta.textContent = result.syncedAt
+            ? `آخر مزامنة ${timeAgo(result.syncedAt)}`
+            : '';
+
+        if (!result.channels || !result.channels.length) {
+            wrap.hidden = true;
+            if (result.reason) {
+                meta.textContent += ` — ${SYNC_REASONS[result.reason] || result.reason}`;
+            }
+            return;
+        }
+
+        render('#syncRows', html`${result.channels.map(channel => html`
             <tr>
-                <td>${LOCKED_LABELS[key]}</td>
-                <td class="hint-mono">${lockedValue(key, locked[key])}</td>
+                <td class="hint-mono">${channel.channelId}</td>
+                <td>${channel.ok
+                    ? html`<span class="badge badge-positive">تعمل</span>`
+                    : html`<span class="badge badge-negative">${SYNC_REASONS[channel.reason] || channel.reason}</span>`}</td>
+                <td>${String(channel.added || 0)}</td>
+                <td>${String(channel.removed || 0)}</td>
             </tr>`)}`);
+        wrap.hidden = false;
+    }
+
+    async function syncNow() {
+        const button = $('#syncNow');
+        button.disabled = true;
+        try {
+            const result = await api('/api/admin/news/sync', { method: 'POST' });
+            paintSync(result);
+            toast(result.added
+                ? `تمت إضافة ${result.added} مسودة.`
+                : 'لا يوجد جديد.');
+            await loadPosts();
+        } catch (error) {
+            toast(error.message, 'error');
+        } finally {
+            button.disabled = false;
+        }
     }
 
     async function saveSettings(event) {
@@ -220,7 +290,12 @@
                     fivemJoinCode: $('#sJoin').value.trim(),
                     discordInviteCode: $('#sInvite').value.trim(),
                     storeUrl: $('#sStore').value.trim(),
-                    publishPlayerList: $('#sPlayers').checked
+                    publishPlayerList: $('#sPlayers').checked,
+                    serverDetailFields: $$('#detailFields input:checked').map(box => box.value),
+                    newsSyncEnabled: $('#sNewsSync').checked,
+                    newsChannelIds: $('#sNewsChannels').value.split(/[\s,]+/).filter(Boolean),
+                    showWelcomeImages: $('#sWelcome').checked,
+                    welcomeChannelId: $('#sWelcomeChannel').value.trim()
                 }
             });
             toast(changed.length ? 'تم حفظ الإعدادات.' : 'لا يوجد تغيير.');
@@ -281,6 +356,7 @@
     async function init() {
         $('#totpForm').addEventListener('submit', signInWithTotp);
         $('#paneSettings').addEventListener('submit', saveSettings);
+        $('#syncNow').addEventListener('click', syncNow);
         $$('.tab').forEach(tab => {
             tab.addEventListener('click', () => showPane(tab.getAttribute('data-pane')));
         });
