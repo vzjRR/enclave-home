@@ -114,12 +114,16 @@
         $('#fPublished').checked = Boolean(post && post.published);
         $('#deletePost').hidden = !post;
 
-        $('#editor').hidden = false;
+        const editor = $('#editor');
+        editor.dataset.open = 'true';
+        editor.setAttribute('aria-hidden', 'false');
         $('#fTitle').focus();
     }
 
     function closeEditor() {
-        $('#editor').hidden = true;
+        const editor = $('#editor');
+        editor.dataset.open = 'false';
+        editor.setAttribute('aria-hidden', 'true');
         editingId = null;
     }
 
@@ -377,7 +381,7 @@
         });
 
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape' && !$('#editor').hidden) closeEditor();
+            if (event.key === 'Escape' && $('#editor').dataset.open === 'true') closeEditor();
         });
 
         if (await loadSession()) await loadPosts();
