@@ -27,6 +27,7 @@ const discordStats = require('./lib/discordStats');
 const fivem = require('./lib/fivem');
 const storeFeed = require('./lib/storeFeed');
 const { News } = require('./lib/news');
+const { Settings } = require('./lib/settings');
 const { createOauth } = require('./lib/oauth');
 const {
     SECURITY_HEADERS, readJsonBody, sendJson, sendError, parseCookies, buildCookie
@@ -56,16 +57,30 @@ const PUBLIC_DIR = __dirname;
 const DATA_DIR = process.env.DATA_DIR
     || (fs.existsSync('/data') ? '/data' : path.join(__dirname, 'data'));
 
-const FIVEM_JOIN_CODE = process.env.FIVEM_JOIN_CODE || '';
+// Where the catalogue is fetched from. Infrastructure, not a link, so it
+// stays in the environment — see lib/settings.js for the full split.
 const STORE_API_BASE = process.env.STORE_API_BASE || 'https://store.enclaverp.cc';
-const STORE_URL = process.env.STORE_URL || STORE_API_BASE;
 
 const DISCORD_GUILD_ID = process.env.DISCORD_GUILD_ID || '';
-const DISCORD_INVITE_CODE = process.env.DISCORD_INVITE_CODE || '';
 const DISCORD_BOT_TOKEN = process.env.DISCORD_BOT_TOKEN || '';
-const DISCORD_INVITE_URL = DISCORD_INVITE_CODE
-    ? `https://discord.gg/${DISCORD_INVITE_CODE}`
-    : '';
+
+/**
+ * The four operational values below live in settings.json once the first
+ * run has seeded them from the environment, so they can be changed from
+ * /admin without shell access. Everything reads them through here rather
+ * than caching a copy, or a change would need a restart to take.
+ */
+const settings = new Settings(DATA_DIR, {
+    fivemJoinCode: process.env.FIVEM_JOIN_CODE || '',
+    discordInviteCode: process.env.DISCORD_INVITE_CODE || '',
+    storeUrl: process.env.STORE_URL || process.env.STORE_API_BASE || 'https://store.enclaverp.cc',
+    publishPlayerList: process.env.FIVEM_PUBLISH_PLAYER_LIST === 'true'
+});
+
+const joinCode = () => settings.current().fivemJoinCode;
+const inviteCode = () => settings.current().discordInviteCode;
+const storeUrl = () => settings.current().storeUrl;
+const inviteUrl = () => (inviteCode() ? `https://discord.gg/${inviteCode()}` : '');
 
 const OWNER_DISCORD_ID = process.env.OWNER_DISCORD_ID || '';
 const ADMIN_DISCORD_IDS = (process.env.ADMIN_DISCORD_IDS || '')
@@ -282,21 +297,25 @@ async function handleApi(req, res, pathname, url) {
 
     if (method === 'GET' && pathname === '/api/site') {
         return sendJson(res, 200, {
-            storeUrl: STORE_URL,
-            discordInviteUrl: DISCORD_INVITE_URL,
-            joinCode: FIVEM_JOIN_CODE,
+            storeUrl: storeUrl(),
+            discordInviteUrl: inviteUrl(),
+            joinCode: joinCode(),
             // fivem://connect is what the FiveM client registers as a
             // protocol handler; the cfx.re link is the browser fallback for
             // anyone without the client installed.
-            connectUrl: FIVEM_JOIN_CODE ? `fivem://connect/${FIVEM_JOIN_CODE}` : '',
-            joinUrl: FIVEM_JOIN_CODE ? `https://cfx.re/join/${FIVEM_JOIN_CODE}` : ''
-        }, { cacheSeconds: 300 });
+            connectUrl: joinCode() ? `fivem://connect/${joinCode()}` : '',
+            joinUrl: joinCode() ? `https://cfx.re/join/${joinCode()}` : ''
+        // Short, because this is now editable from the console: a stale
+        // join code in a shared cache is a dead button for players.
+        }, { cacheSeconds: 30 });
     }
 
     /* ---- live FiveM stats ---- */
 
     if (method === 'GET' && pathname === '/api/server') {
-        const stats = await fivem.getStats(FIVEM_JOIN_CODE);
+        const stats = await fivem.getStats(joinCode(), {
+            publishPlayers: settings.current().publishPlayerList
+        });
         return sendJson(res, 200, stats, { cacheSeconds: 30 });
     }
 
@@ -305,10 +324,10 @@ async function handleApi(req, res, pathname, url) {
     if (method === 'GET' && pathname === '/api/discord') {
         const stats = await discordStats.getStats({
             guildId: DISCORD_GUILD_ID,
-            inviteCode: DISCORD_INVITE_CODE,
+            inviteCode: inviteCode(),
             botToken: DISCORD_BOT_TOKEN
         });
-        return sendJson(res, 200, { ...stats, inviteUrl: DISCORD_INVITE_URL },
+        return sendJson(res, 200, { ...stats, inviteUrl: inviteUrl() },
             { cacheSeconds: 60 });
     }
 
@@ -316,7 +335,7 @@ async function handleApi(req, res, pathname, url) {
 
     if (method === 'GET' && pathname === '/api/store/latest') {
         const feed = await storeFeed.getLatest(STORE_API_BASE);
-        return sendJson(res, 200, { ...feed, storeUrl: STORE_URL }, { cacheSeconds: 120 });
+        return sendJson(res, 200, { ...feed, storeUrl: storeUrl() }, { cacheSeconds: 120 });
     }
 
     /* ---- news, public ---- */
@@ -403,6 +422,48 @@ async function handleApi(req, res, pathname, url) {
         return sendJson(res, 200, { ok: true });
     }
 
+    /* ---- settings, admin ---- */
+
+    if (pathname === '/api/admin/settings') {
+        const user = requireStaff(req, res);
+        if (!user) return undefined;
+        if (!requireCsrf(req, res)) return undefined;
+
+        if (method === 'GET') {
+            return sendJson(res, 200, {
+                settings: settings.current(),
+                // Shown read-only in the console so an operator can see what
+                // is configured without being able to change it here, and
+                // knows to reach for the env file rather than hunting for a
+                // field that does not exist.
+                locked: {
+                    guildId: DISCORD_GUILD_ID,
+                    storeApiBase: STORE_API_BASE,
+                    publicBaseUrl: PUBLIC_BASE_URL,
+                    discordSignIn: oauth.configured,
+                    botToken: Boolean(DISCORD_BOT_TOKEN)
+                }
+            });
+        }
+
+        if (method === 'PUT') {
+            const body = await readJsonBody(req);
+            const { settings: saved, changed } = await settings.save(body, user.displayName);
+
+            // Drop only the caches whose inputs moved. A store-URL edit must
+            // not throw away a warm FiveM poll, and clearing everything on
+            // every save would turn a typo-and-fix into four needless
+            // upstream round trips.
+            if (changed.includes('fivemJoinCode') || changed.includes('publishPlayerList')) {
+                fivem.resetCache();
+            }
+            if (changed.includes('discordInviteCode')) discordStats.resetCache();
+            if (changed.includes('storeUrl')) storeFeed.resetCache();
+
+            return sendJson(res, 200, { settings: saved, changed });
+        }
+    }
+
     /* ---- news, admin ---- */
 
     if (pathname === '/api/admin/news' || pathname.startsWith('/api/admin/news/')) {
@@ -454,10 +515,10 @@ async function handleApi(req, res, pathname, url) {
  * buttons work with JavaScript disabled.
  */
 const REDIRECTS = {
-    '/join': () => (FIVEM_JOIN_CODE ? `https://cfx.re/join/${FIVEM_JOIN_CODE}` : ''),
-    '/connect': () => (FIVEM_JOIN_CODE ? `fivem://connect/${FIVEM_JOIN_CODE}` : ''),
-    '/discord': () => DISCORD_INVITE_URL,
-    '/store': () => STORE_URL
+    '/join': () => (joinCode() ? `https://cfx.re/join/${joinCode()}` : ''),
+    '/connect': () => (joinCode() ? `fivem://connect/${joinCode()}` : ''),
+    '/discord': () => inviteUrl(),
+    '/store': () => storeUrl()
 };
 
 function handleRedirect(res, target) {
@@ -590,6 +651,7 @@ const server = http.createServer(async (req, res) => {
 async function start() {
     await fsp.mkdir(DATA_DIR, { recursive: true });
     await news.load();
+    await settings.load();
 
     auth.initAdminTotp(process.env.ADMIN_TOTP_SECRET);
 
@@ -603,11 +665,12 @@ async function start() {
 
     server.listen(PORT, BIND_HOST, () => {
         console.log(`enclave-home listening on http://${BIND_HOST}:${PORT}`);
-        if (!FIVEM_JOIN_CODE) {
-            console.warn('FIVEM_JOIN_CODE is unset — the live server board will show "not configured".');
+        if (!joinCode()) {
+            console.warn('No FiveM join code set — the live server board will show "not configured".');
+            console.warn('Set it at /admin, or seed FIVEM_JOIN_CODE before the first run.');
         }
-        if (!DISCORD_INVITE_CODE && !DISCORD_BOT_TOKEN) {
-            console.warn('Neither DISCORD_INVITE_CODE nor DISCORD_BOT_TOKEN is set — Discord stats stay empty.');
+        if (!inviteCode() && !DISCORD_BOT_TOKEN) {
+            console.warn('No Discord invite code and no bot token — Discord stats stay empty.');
         }
     });
 }
