@@ -258,6 +258,37 @@ async function main() {
         ok(!/<script(?![^>]*\ssrc=)/i.test(home.text),
             'no inline <script> in the page the CSP would block');
 
+        /* ------------------ asset cache-busting ------------------ */
+
+        // A deploy that ships new HTML against a cached old script produces
+        // a control that renders but does nothing. Cloudflare rewrites the
+        // origin's Cache-Control to its own Browser Cache TTL, so the fix
+        // has to be in the URL rather than in a header.
+        const versioned = /(?:src|href)="\/js\/admin\.js\?v=([A-Za-z0-9_-]+)"/.exec(
+            (await request(base, '/admin')).text);
+        ok(versioned, 'scripts are referenced with a version fingerprint');
+
+        if (versioned) {
+            const asset = await request(base, `/js/admin.js?v=${versioned[1]}`);
+            eq(asset.status, 200, 'the fingerprinted URL serves the script');
+            ok(asset.headers['cache-control'].includes('immutable'),
+                'a fingerprinted asset is cached hard');
+        }
+
+        eq((await request(base, '/admin')).headers['cache-control'], 'no-cache',
+            'the HTML carrying the fingerprints is never cached');
+
+        // Every page must be fingerprinted, not just the one checked above.
+        for (const page of ['/', '/news']) {
+            const body = (await request(base, page)).text;
+            const bare = /(?:src|href)="\/(?:js|css)\/[^"?]+"/.exec(body);
+            ok(!bare, `no unversioned asset on ${page}${bare ? ` (${bare[0]})` : ''}`);
+        }
+
+        // The rewrite must not touch third-party URLs.
+        ok(!/fonts\.googleapis\.com[^"]*\?v=/.test((await request(base, '/')).text),
+            'external URLs are left alone by the rewrite');
+
         for (const attempt of [
             '/server.js', '/lib/auth.js', '/data/news.json',
             '/../server.js', '/css/../../server.js', '/css/%2e%2e/%2e%2e/server.js'

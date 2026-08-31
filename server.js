@@ -91,6 +91,12 @@ const USER_COOKIE = 'enclave_home_user';
 const OAUTH_STATE_COOKIE = 'enclave_home_oauth_state';
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+/**
+ * Set at boot from the bytes of everything in js/ and css/, so it changes
+ * exactly when a deploy changes an asset and not otherwise.
+ */
+let ASSET_VERSION = 'dev';
+
 const news = new News(DATA_DIR);
 
 const oauth = createOauth({
@@ -162,6 +168,27 @@ function resolveStatic(urlPath) {
     return resolved;
 }
 
+/**
+ * Fingerprint every served script and stylesheet with the build's version.
+ *
+ * Without this a deploy ships new HTML against a stale script, because
+ * Cloudflare rewrites the origin's Cache-Control to its own Browser Cache
+ * TTL -- the page said max-age=0, must-revalidate and the browser was told
+ * four hours. The HTML is no-cache so it updates immediately; the script
+ * does not, and the mismatch shows up as a control that renders but does
+ * nothing when clicked.
+ *
+ * Versioned URLs fix that at the source rather than in a dashboard
+ * setting: a new build is a new URL, which no cache anywhere can serve a
+ * stale copy of. It also means the assets can safely be cached hard.
+ */
+function versionAssets(html) {
+    return html.replace(
+        /(src|href)="(\/(?:js|css|assets)\/[^"?]+)"/g,
+        (match, attr, url) => `${attr}="${url}?v=${ASSET_VERSION}"`
+    );
+}
+
 async function serveStatic(req, res, filePath) {
     let data;
     try {
@@ -171,6 +198,10 @@ async function serveStatic(req, res, filePath) {
     }
 
     const ext = path.extname(filePath).toLowerCase();
+    if (ext === '.html') {
+        data = Buffer.from(versionAssets(data.toString('utf8')), 'utf8');
+    }
+
     const etag = `"${crypto.createHash('sha1').update(data).digest('base64url')}"`;
 
     if (req.headers['if-none-match'] === etag) {
@@ -182,7 +213,12 @@ async function serveStatic(req, res, filePath) {
         ...SECURITY_HEADERS,
         'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
         'Content-Length': data.length,
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=0, must-revalidate',
+        // A fingerprinted asset is immutable by construction, so it can be
+        // cached for a year. The HTML carrying those fingerprints is the
+        // one thing that must always be revalidated.
+        'Cache-Control': ext === '.html'
+            ? 'no-cache'
+            : 'public, max-age=31536000, immutable',
         ETag: etag
     });
     if (req.method === 'HEAD') return res.end();
@@ -648,8 +684,26 @@ const server = http.createServer(async (req, res) => {
 
 /* -------------------------------- boot -------------------------------- */
 
+async function computeAssetVersion() {
+    const hash = crypto.createHash('sha1');
+    for (const dir of ['js', 'css']) {
+        let names;
+        try {
+            names = (await fsp.readdir(path.join(PUBLIC_DIR, dir))).sort();
+        } catch {
+            continue;
+        }
+        for (const name of names) {
+            hash.update(name);
+            hash.update(await fsp.readFile(path.join(PUBLIC_DIR, dir, name)));
+        }
+    }
+    return hash.digest('base64url').slice(0, 10);
+}
+
 async function start() {
     await fsp.mkdir(DATA_DIR, { recursive: true });
+    ASSET_VERSION = await computeAssetVersion();
     await news.load();
     await settings.load();
 
