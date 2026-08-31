@@ -177,7 +177,7 @@
 <!-- ========================= community ========================= -->
 <section class="section shell-page" id="community">
     <div class="discord" data-animate>
-        <div>
+        <div class="discord-info">
             <h2 class="discord-title">مجتمع Enclave على ديسكورد</h2>
             <p class="discord-sub">
                 الدعم، التقديمات، الفعاليات وكل إعلانات السيرفر — كلها تبدأ من هنا.
@@ -192,15 +192,6 @@
                     <div class="stat-label">متصل الآن</div>
                 </div>
             </div>
-
-            <!-- Newest members, as the welcome cards the bot already posts.
-                 Images only — no names. Hidden until there are any. -->
-            <div class="welcome" id="welcome" hidden>
-                <p class="welcome-label">آخر الأعضاء</p>
-                <div class="welcome-viewport">
-                    <div class="welcome-row" id="welcomeRow"></div>
-                </div>
-            </div>
         </div>
         <a class="btn btn-primary" href="/discord" target="_blank" rel="noopener">
             <svg class="icon" viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
@@ -208,6 +199,19 @@
             </svg>
             انضم إلى الديسكورد
         </a>
+
+        <!-- Newest members, as the welcome cards the bot already posts.
+             Images only — no names. Hidden until there are any. Spans the
+             full panel width, below the info/button row above. -->
+        <div class="welcome" id="welcome" hidden>
+            <p class="welcome-label">
+                <span class="status-dot" aria-hidden="true"></span>
+                آخر الأعضاء
+            </p>
+            <div class="welcome-viewport">
+                <div class="welcome-row" id="welcomeRow"></div>
+            </div>
+        </div>
     </div>
 </section>
 

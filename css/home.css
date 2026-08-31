@@ -252,6 +252,11 @@
     border-radius: var(--radius-xl);
 }
 
+/* The welcome strip spans both columns as its own row beneath the info
+   and the join button, rather than competing with them for width -- it
+   is meant to read as the panel's centerpiece, not a footnote. */
+.discord .welcome { grid-column: 1 / -1; }
+
 @media (max-width: 760px) {
     .discord { grid-template-columns: minmax(0, 1fr); }
 }
@@ -367,34 +372,47 @@
    it whole at a fixed height with the width following naturally — cropping
    into a square would cut off whatever the card actually says. The row is
    doubled in the markup and scrolled by exactly half its own width, which
-   loops seamlessly no matter how many images or how wide each one is.
+   loops seamlessly no matter how many images or how wide each one is, and
+   never pauses -- it is meant to read as a live, ongoing strip.
 --------------------------------------------------------------- */
 
-.welcome { margin-block-start: var(--space-5); }
+.welcome {
+    margin-block-start: var(--space-6);
+    padding-block-start: var(--space-5);
+    border-block-start: 1px solid var(--border-subtle);
+}
 
 .welcome-label {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     font-size: var(--text-xs);
     color: var(--text-muted);
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
-    margin-block-end: var(--space-3);
+    margin-block-end: var(--space-4);
+}
+
+/* Reuses the live-server board's pulse dot -- the same "this updates
+   itself" signal, not a new one invented just for this strip. */
+.welcome-label .status-dot {
+    color: var(--positive);
+    animation: status-pulse 1.8s ease-in-out infinite;
 }
 
 .welcome-viewport {
     overflow: hidden;
-    -webkit-mask-image: linear-gradient(to left, transparent, black 6%, black 94%, transparent);
-    mask-image: linear-gradient(to left, transparent, black 6%, black 94%, transparent);
+    -webkit-mask-image: linear-gradient(to left, transparent, black 4%, black 96%, transparent);
+    mask-image: linear-gradient(to left, transparent, black 4%, black 96%, transparent);
 }
 
 .welcome-row {
     display: flex;
     align-items: center;
-    gap: var(--space-3);
+    gap: var(--space-4);
     inline-size: max-content;
-    animation: welcome-scroll var(--welcome-dur, 24s) linear infinite;
+    animation: welcome-scroll var(--welcome-dur, 32s) linear infinite;
 }
-
-.welcome-viewport:hover .welcome-row { animation-play-state: paused; }
 
 @keyframes welcome-scroll {
     from { transform: translateX(0); }
@@ -402,14 +420,28 @@
 }
 
 .welcome-img {
-    block-size: 84px;
+    block-size: 144px;
     inline-size: auto;
-    max-inline-size: 220px;
+    max-inline-size: 320px;
     flex: 0 0 auto;
     border-radius: var(--radius-lg);
     object-fit: contain;
     background: var(--surface-inset);
-    border: 1px solid var(--border-strong);
+    border: 1px solid var(--border-subtle);
+    box-shadow: var(--shadow-md);
+    transition: transform var(--dur-fast) var(--ease-smooth),
+                box-shadow var(--dur-fast) var(--ease-smooth);
+}
+
+/* A card can still answer to the cursor -- it just never stops the belt
+   itself, which is the whole point of a strip that is meant to loop. */
+.welcome-img:hover {
+    transform: translateY(-4px) scale(1.03);
+    box-shadow: var(--shadow-lg);
+}
+
+@media (max-width: 560px) {
+    .welcome-img { block-size: 104px; max-inline-size: 230px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -419,6 +451,7 @@
         max-inline-size: 100%;
         scrollbar-width: thin;
     }
+    .welcome-label .status-dot { animation: none; }
 }
 
 /* ---------------------------------------------------------------
