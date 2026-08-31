@@ -268,15 +268,25 @@
                 // scrollable strip instead, so it isn't shown twice.
                 render(row, html`${cards}`);
             } else {
-                // ~3.5s per card keeps the strip's speed steady whether
-                // there are 3 images or 10, rather than a fixed duration
-                // that crawls or races depending on count. Scaled up from
-                // the original 2.5s/10s floor to match the larger cards
-                // (144px tall, up to 320px wide vs. the old 220px cap) --
-                // otherwise the same duration now covers more pixels and
-                // the loop visibly speeds up.
-                row.style.setProperty('--welcome-dur', `${Math.max(cards.length * 3.5, 14)}s`);
-                render(row, html`${cards}${cards}`);
+                // The CSS loop only stays seamless if one half's rendered
+                // width is at least the viewport's width -- otherwise the
+                // tail of the scroll shows empty space before it jumps back
+                // to the start. Two copies of the real image set used to be
+                // "enough" only because the strip lived in a narrow column;
+                // now that it spans the full panel, a handful of real
+                // images can easily render narrower than a wide screen.
+                // Repeating the set until each half carries at least 24
+                // images (~24 * 256px including gaps =~ 6,100px) keeps a
+                // half wider than any realistic viewport regardless of how
+                // few images the API actually returns.
+                const repeat = Math.max(1, Math.ceil(24 / cards.length));
+                const half = Array.from({ length: repeat }, () => cards).flat();
+
+                // ~2.6s per image in a half keeps the strip's speed steady
+                // whether one repeated set is 3 images or 30, and matches
+                // the smaller card size (max 240px wide, down from 320px).
+                row.style.setProperty('--welcome-dur', `${Math.max(half.length * 2.6, 10)}s`);
+                render(row, html`${half}${half}`);
             }
             wrap.hidden = false;
         } catch {

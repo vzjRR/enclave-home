@@ -377,8 +377,8 @@
 --------------------------------------------------------------- */
 
 .welcome {
-    margin-block-start: var(--space-6);
-    padding-block-start: var(--space-5);
+    margin-block-start: var(--space-4);
+    padding-block-start: var(--space-4);
     border-block-start: 1px solid var(--border-subtle);
 }
 
@@ -390,7 +390,7 @@
     color: var(--text-muted);
     letter-spacing: var(--tracking-wide);
     text-transform: uppercase;
-    margin-block-end: var(--space-4);
+    margin-block-end: var(--space-3);
 }
 
 /* Reuses the live-server board's pulse dot -- the same "this updates
@@ -402,6 +402,15 @@
 
 .welcome-viewport {
     overflow: hidden;
+    /* The page is dir="rtl"; a `width: max-content` flex row inherits
+       that and its static position/overflow direction no longer line up
+       with a plain `translateX(-50%)` loop -- for part of every cycle the
+       whole row would scroll clean past the viewport instead of the next
+       copy sliding into view, showing as a blank gap. The two rows of
+       images carry no reading direction of their own, so pinning this one
+       component to ltr keeps the marquee math in the coordinate space it
+       was written for without touching the page's actual RTL layout. */
+    direction: ltr;
     -webkit-mask-image: linear-gradient(to left, transparent, black 4%, black 96%, transparent);
     mask-image: linear-gradient(to left, transparent, black 4%, black 96%, transparent);
 }
@@ -409,7 +418,7 @@
 .welcome-row {
     display: flex;
     align-items: center;
-    gap: var(--space-4);
+    gap: var(--space-3);
     inline-size: max-content;
     animation: welcome-scroll var(--welcome-dur, 32s) linear infinite;
 }
@@ -420,9 +429,9 @@
 }
 
 .welcome-img {
-    block-size: 144px;
+    block-size: 112px;
     inline-size: auto;
-    max-inline-size: 320px;
+    max-inline-size: 240px;
     flex: 0 0 auto;
     border-radius: var(--radius-lg);
     object-fit: contain;
@@ -441,7 +450,7 @@
 }
 
 @media (max-width: 560px) {
-    .welcome-img { block-size: 104px; max-inline-size: 230px; }
+    .welcome-img { block-size: 84px; max-inline-size: 190px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
