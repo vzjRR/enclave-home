@@ -363,7 +363,11 @@
    Welcome images
 
    Images only — the row carries no names, so it needs no text styling.
-   A fixed square keeps a mixed bag of card sizes on one clean line.
+   The bot posts a full welcome *card* (not an avatar), so the frame shows
+   it whole at a fixed height with the width following naturally — cropping
+   into a square would cut off whatever the card actually says. The row is
+   doubled in the markup and scrolled by exactly half its own width, which
+   loops seamlessly no matter how many images or how wide each one is.
 --------------------------------------------------------------- */
 
 .welcome { margin-block-start: var(--space-5); }
@@ -376,19 +380,45 @@
     margin-block-end: var(--space-3);
 }
 
+.welcome-viewport {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to left, transparent, black 6%, black 94%, transparent);
+    mask-image: linear-gradient(to left, transparent, black 6%, black 94%, transparent);
+}
+
 .welcome-row {
     display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-2);
+    align-items: center;
+    gap: var(--space-3);
+    inline-size: max-content;
+    animation: welcome-scroll var(--welcome-dur, 24s) linear infinite;
+}
+
+.welcome-viewport:hover .welcome-row { animation-play-state: paused; }
+
+@keyframes welcome-scroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
 }
 
 .welcome-img {
-    inline-size: 44px;
-    block-size: 44px;
-    border-radius: 50%;
-    object-fit: cover;
+    block-size: 84px;
+    inline-size: auto;
+    max-inline-size: 220px;
+    flex: 0 0 auto;
+    border-radius: var(--radius-lg);
+    object-fit: contain;
     background: var(--surface-inset);
     border: 1px solid var(--border-strong);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .welcome-row {
+        animation: none;
+        overflow-x: auto;
+        max-inline-size: 100%;
+        scrollbar-width: thin;
+    }
 }
 
 /* ---------------------------------------------------------------

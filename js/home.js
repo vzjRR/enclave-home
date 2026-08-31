@@ -257,8 +257,23 @@
             // Images only, as asked: no names, no handles, no timestamps.
             // alt is empty because these are decorative here — a screen
             // reader announcing ten unlabelled avatars adds nothing.
-            render('#welcomeRow', html`${data.images.map(image => html`
-                <img class="welcome-img" src="${safeHref(image.url)}" alt="" loading="lazy">`)}`);
+            const cards = data.images.map(image => html`
+                <img class="welcome-img" src="${safeHref(image.url)}" alt="" loading="lazy">`);
+
+            const row = $('#welcomeRow');
+            const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduceMotion) {
+                // The CSS loop relies on a doubled row scrolled by half its
+                // width; a viewer who asked for less motion gets a plain
+                // scrollable strip instead, so it isn't shown twice.
+                render(row, html`${cards}`);
+            } else {
+                // ~2.5s per card keeps the strip's speed steady whether
+                // there are 3 images or 10, rather than a fixed duration
+                // that crawls or races depending on count.
+                row.style.setProperty('--welcome-dur', `${Math.max(cards.length * 2.5, 10)}s`);
+                render(row, html`${cards}${cards}`);
+            }
             wrap.hidden = false;
         } catch {
             // Stays hidden.
