@@ -38,6 +38,16 @@
         unknown: 'غير معروف'
     };
 
+    /** Whole seconds -> "بعد X ساعة و Y دقيقة"-style Arabic countdown text. */
+    function formatDuration(totalSeconds) {
+        const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
+        const hours = Math.floor(totalMinutes / 60);
+        const minutes = totalMinutes % 60;
+        if (hours === 0) return `بعد ${minutes} دقيقة`;
+        if (minutes === 0) return `بعد ${hours} ساعة`;
+        return `بعد ${hours} ساعة و ${minutes} دقيقة`;
+    }
+
     /**
      * GTA V's world coordinates, approximately -- not to scale, just enough
      * to place a dot roughly where a player is relative to the others. The
@@ -104,6 +114,20 @@
         if (name) $('#serverName').textContent = name;
         $('#serverGametype').textContent = stats.gametype || '—';
         $('#serverMap').textContent = stats.mapname || '—';
+
+        // Hidden entirely rather than shown as "—": a schedule this site
+        // doesn't know about (RESTART_SCHEDULE_TIMES unset) is not a "no
+        // data yet" state, it's a feature nobody turned on.
+        const restartRow = $('#serverNextRestartRow');
+        if (restartRow) {
+            const seconds = Number(stats.nextRestartSeconds);
+            if (Number.isFinite(seconds) && seconds > 0) {
+                $('#serverNextRestart').textContent = formatDuration(seconds);
+                restartRow.hidden = false;
+            } else {
+                restartRow.hidden = true;
+            }
+        }
 
         const note = $('#serverNote');
         if (note) {

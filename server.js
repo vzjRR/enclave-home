@@ -25,6 +25,7 @@ const path = require('path');
 const auth = require('./lib/auth');
 const discordStats = require('./lib/discordStats');
 const fivem = require('./lib/fivem');
+const restartSchedule = require('./lib/restartSchedule');
 const storeFeed = require('./lib/storeFeed');
 const { News } = require('./lib/news');
 const { Settings, DETAIL_FIELDS } = require('./lib/settings');
@@ -414,7 +415,10 @@ async function handleApi(req, res, pathname, url) {
         return sendJson(res, 200, {
             ...stats,
             details,
-            detailFields: config.serverDetailFields
+            detailFields: config.serverDetailFields,
+            // Independent of the live poll above -- a known schedule
+            // (RESTART_SCHEDULE_TIMES), not something FiveM reports.
+            nextRestartSeconds: restartSchedule.getNext()
         }, { cacheSeconds: 30 });
     }
 

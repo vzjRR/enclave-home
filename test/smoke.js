@@ -269,6 +269,8 @@ async function main() {
             // re-poll a downed upstream, rather than asserting against a
             // still-warm entry and proving nothing.
             FIVEM_STATS_TTL_MS: '300',
+            RESTART_SCHEDULE_TIMES: '06:00,18:00',
+            RESTART_SCHEDULE_UTC_OFFSET_MINUTES: '240',
             DISCORD_API_BASE: stubBase,
             DISCORD_INVITE_CODE: 'testinvite',
             DISCORD_GUILD_ID: '123',
@@ -371,6 +373,13 @@ async function main() {
         eq(live.json.playerList[0].ping, 38, 'player ping survives');
 
         eq(live.headers['cache-control'], 'public, max-age=30', 'server stats are cacheable');
+
+        // Independent of the FiveM poll above -- a known schedule, not
+        // something the game server reports.
+        ok(Number.isFinite(live.json.nextRestartSeconds) && live.json.nextRestartSeconds > 0,
+            'next restart countdown is a positive number');
+        ok(live.json.nextRestartSeconds <= 12 * 3600,
+            'next restart is never more than 12h out for a twice-daily schedule');
 
         // Cached: a second call must not re-poll upstream.
         const dynamicBefore = stubState.dynamicCalls;
